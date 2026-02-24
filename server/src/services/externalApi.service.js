@@ -91,12 +91,25 @@ function transformGameSummary(event) {
     loserExternalId = loser?.team?.id || null;
   }
 
+  // Extract team names, IDs, and scores
+  const teams = competitors.map((c) => ({
+    external_team_id: String(c.team?.id || ''),
+    name: c.team?.displayName || c.team?.shortDisplayName || '',
+    score: parseInt(c.score, 10) || 0,
+    is_home: c.homeAway === 'home',
+  }));
+
   return {
     external_game_id: String(event.id),
+    name: event.name || '',
+    short_name: event.shortName || '',
+    start_time: event.date || null,
     status,
+    status_detail: event.status?.type?.shortDetail || '',
     tournament_round: resolveRound(event),
     winner_external_id: winnerExternalId,
     loser_external_id: loserExternalId,
+    teams,
   };
 }
 

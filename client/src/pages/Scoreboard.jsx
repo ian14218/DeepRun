@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 import { useAuth } from '../context/AuthContext';
 import { getLeague } from '../services/leagueService';
 import { getScoreboard, getTeamRoster } from '../services/standingsService';
@@ -16,6 +17,7 @@ const STATUS_VARIANT = {
 };
 
 export default function Scoreboard() {
+  useDocumentTitle('Scoreboard');
   const { id: leagueId } = useParams();
   const { user } = useAuth();
   const [games, setGames] = useState([]);

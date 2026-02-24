@@ -7,7 +7,12 @@
  *   - draft:pick     — when any pick is made
  *   - draft:turn     — whose turn is next
  *   - draft:complete — when all picks have been made
+ *   - draft:timer    — countdown info
+ *   - draft:message  — chat messages
  */
+const draftMessageModel = require('../models/draftMessage.model');
+const { stripHtml } = require('../utils/sanitize');
+
 function initDraftSocket(io) {
   io.on('connection', (socket) => {
     socket.on('join-draft', ({ leagueId }) => {
@@ -16,6 +21,26 @@ function initDraftSocket(io) {
 
     socket.on('leave-draft', ({ leagueId }) => {
       if (leagueId) socket.leave(`league:${leagueId}`);
+    });
+
+    socket.on('draft:message', async ({ leagueId, userId, username, message }) => {
+      if (!leagueId || !userId || !message) return;
+
+      const sanitized = stripHtml(message).slice(0, 500);
+      if (!sanitized) return;
+
+      try {
+        const saved = await draftMessageModel.create(leagueId, userId, sanitized);
+        io.to(`league:${leagueId}`).emit('draft:message', {
+          id: saved.id,
+          user_id: userId,
+          username,
+          message: sanitized,
+          created_at: saved.created_at,
+        });
+      } catch {
+        // Silently fail — chat is non-critical
+      }
     });
   });
 }

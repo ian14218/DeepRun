@@ -1,11 +1,13 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/user.model');
+const { stripHtml } = require('../utils/sanitize');
 
 const SALT_ROUNDS = 10;
 const JWT_EXPIRY = '24h';
 
 async function register(username, email, password) {
+  username = stripHtml(username);
   const existing = await userModel.findByEmail(email);
   if (existing) {
     const err = new Error('Email already in use');
@@ -21,6 +23,12 @@ async function register(username, email, password) {
 async function login(email, password) {
   const user = await userModel.findByEmail(email);
   if (!user) {
+    const err = new Error('Invalid credentials');
+    err.status = 401;
+    throw err;
+  }
+
+  if (user.is_bot) {
     const err = new Error('Invalid credentials');
     err.status = 401;
     throw err;

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 import { joinLeague } from '../services/leagueService';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 
 export default function JoinLeague() {
+  useDocumentTitle('Join League');
   const navigate = useNavigate();
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');

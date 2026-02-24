@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 import { getStandings } from '../services/standingsService';
 import StandingsTable from '../components/StandingsTable';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Standings() {
+  useDocumentTitle('Standings');
   const { id } = useParams();
   const [standings, setStandings] = useState([]);
   const [loading, setLoading] = useState(true);

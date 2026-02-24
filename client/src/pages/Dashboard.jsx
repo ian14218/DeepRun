@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 import { getLeagues } from '../services/leagueService';
 import { Plus, UserPlus, Trophy, Users } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,6 +15,7 @@ const STATUS_CONFIG = {
 };
 
 export default function Dashboard() {
+  useDocumentTitle('Dashboard');
   const [leagues, setLeagues] = useState([]);
   const [loading, setLoading] = useState(true);
 

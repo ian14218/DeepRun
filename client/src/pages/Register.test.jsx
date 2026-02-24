@@ -65,7 +65,7 @@ describe('Register page', () => {
     await user.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(/username is required/i)).toBeInTheDocument();
     });
   });
 

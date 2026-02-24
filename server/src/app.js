@@ -1,5 +1,9 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth.routes');
@@ -10,15 +14,33 @@ const standingsRoutes = require('./routes/standings.routes');
 const adminRoutes = require('./routes/admin.routes');
 const { authenticateToken } = require('./middleware/auth.middleware');
 const errorHandler = require('./middleware/errorHandler');
+const pool = require('./db');
 
 const app = express();
 
-app.use(cors());
+// Security headers (CSP disabled — Vite build uses inline scripts)
+app.use(helmet({ contentSecurityPolicy: false }));
+
+// Request logging
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+}
+
+// CORS — lock to CORS_ORIGIN in production, allow all in dev
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  credentials: true,
+}));
 app.use(express.json());
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+// Health check with DB ping
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok', database: 'connected' });
+  } catch {
+    res.status(503).json({ status: 'error', database: 'disconnected' });
+  }
 });
 
 // Auth routes
@@ -43,6 +65,16 @@ app.use('/api/admin', adminRoutes);
 app.get('/api/protected-test', authenticateToken, (req, res) => {
   res.json({ message: 'ok', user: req.user });
 });
+
+// Serve client build in production (when dist exists)
+const clientDistPath = path.join(__dirname, '../../client/dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  // SPA fallback — serve index.html for non-API routes
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
 
 // Global error handler — must be last
 app.use(errorHandler);

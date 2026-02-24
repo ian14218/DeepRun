@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 import DeepRunLogo from '../components/DeepRunLogo';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,16 +9,31 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 
 export default function Login() {
+  useDocumentTitle('Log In');
   const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  function validateEmail(value) {
+    if (!value) return 'Email is required';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Invalid email format';
+    return '';
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    const errors = {};
+    const emailErr = validateEmail(email);
+    if (emailErr) errors.email = emailErr;
+    if (!password) errors.password = 'Password is required';
+    if (Object.keys(errors).length) { setFieldErrors(errors); return; }
+    setFieldErrors({});
+
     setLoading(true);
     try {
       await login(email, password);
@@ -57,9 +73,11 @@ export default function Login() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => { const err = validateEmail(email); setFieldErrors((p) => ({ ...p, email: err })); }}
                 autoComplete="email"
                 placeholder="you@example.com"
               />
+              {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
             </div>
 
             <div className="space-y-2">
@@ -72,6 +90,7 @@ export default function Login() {
                 autoComplete="current-password"
                 placeholder="Enter your password"
               />
+              {fieldErrors.password && <p className="text-xs text-destructive">{fieldErrors.password}</p>}
             </div>
 
             <Button type="submit" disabled={loading} className="w-full">

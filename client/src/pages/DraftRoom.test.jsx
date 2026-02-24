@@ -18,6 +18,9 @@ vi.mock('../components/PlayerList', () => ({
     </div>
   ),
 }));
+vi.mock('../components/DraftChat', () => ({
+  default: () => <div data-testid="draft-chat">Chat</div>,
+}));
 
 import DraftRoom from './DraftRoom';
 import * as draftService from '../services/draftService';

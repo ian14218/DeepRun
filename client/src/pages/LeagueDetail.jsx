@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getLeague, fillWithBots } from '../services/leagueService';
+import useDocumentTitle from '../hooks/useDocumentTitle';
+import { getLeague, fillWithBots, updateLeague, leaveLeague, removeMember } from '../services/leagueService';
 import { getStandings, getTeamRoster } from '../services/standingsService';
 import PlayerRow from '../components/PlayerRow';
-import { BarChart3, Users, Swords, Tv, Trophy, Copy, Bot, Play } from 'lucide-react';
+import { BarChart3, Users, Swords, Tv, Trophy, Copy, Bot, Play, LogOut, UserMinus, Pencil } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,16 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -47,6 +58,7 @@ const NAV_CARDS = [
 export default function LeagueDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [league, setLeague] = useState(null);
   const [standings, setStandings] = useState([]);
   const [myRoster, setMyRoster] = useState([]);
@@ -55,6 +67,14 @@ export default function LeagueDetail() {
   const [error, setError] = useState('');
   const [fillingBots, setFillingBots] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const [showRemoveDialog, setShowRemoveDialog] = useState(null); // member to remove
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editTeamCount, setEditTeamCount] = useState(8);
+  const [editRosterSize, setEditRosterSize] = useState(10);
+  const [editDraftTimer, setEditDraftTimer] = useState(90);
+  useDocumentTitle(league?.name || 'League');
 
   async function handleFillBots() {
     setFillingBots(true);
@@ -75,6 +95,57 @@ export default function LeagueDetail() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  }
+
+  async function handleLeaveLeague() {
+    try {
+      await leaveLeague(id);
+      toast.success('Left league');
+      navigate('/dashboard');
+    } catch {
+      toast.error('Failed to leave league.');
+    } finally {
+      setShowLeaveDialog(false);
+    }
+  }
+
+  async function handleRemoveMember() {
+    if (!showRemoveDialog) return;
+    try {
+      await removeMember(id, showRemoveDialog.user_id);
+      const leagueData = await getLeague(id);
+      setLeague(leagueData);
+      toast.success(`${showRemoveDialog.username} removed`);
+    } catch {
+      toast.error('Failed to remove member.');
+    } finally {
+      setShowRemoveDialog(null);
+    }
+  }
+
+  function openEditDialog() {
+    setEditName(league.name);
+    setEditTeamCount(league.team_count);
+    setEditRosterSize(league.roster_size);
+    setEditDraftTimer(league.draft_timer_seconds ?? 90);
+    setShowEditDialog(true);
+  }
+
+  async function handleEditLeague(e) {
+    e.preventDefault();
+    try {
+      const updated = await updateLeague(id, {
+        name: editName,
+        team_count: Number(editTeamCount),
+        roster_size: Number(editRosterSize),
+        draft_timer_seconds: Number(editDraftTimer),
+      });
+      setLeague((prev) => ({ ...prev, ...updated }));
+      toast.success('League updated');
+      setShowEditDialog(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update league.');
+    }
   }
 
   useEffect(() => {
@@ -142,6 +213,11 @@ export default function LeagueDetail() {
           <div className="flex items-center gap-3 mb-1">
             <h1 className="text-3xl font-bold">{league.name}</h1>
             <Badge variant={status.variant}>{status.label}</Badge>
+            {isCommissioner && league.draft_status === 'pre_draft' && (
+              <Button variant="ghost" size="icon" onClick={openEditDialog} className="h-7 w-7">
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             {league.members?.length ?? 0} / {league.team_count} members · Roster size: {league.roster_size}
@@ -186,6 +262,14 @@ export default function LeagueDetail() {
             </Link>
           </Button>
         </div>
+      )}
+
+      {/* Leave league (non-commissioner, pre-draft) */}
+      {!isCommissioner && league.draft_status === 'pre_draft' && (
+        <Button variant="outline" className="text-destructive" onClick={() => setShowLeaveDialog(true)}>
+          <LogOut className="h-4 w-4 mr-1.5" />
+          Leave League
+        </Button>
       )}
 
       {/* Navigation cards */}
@@ -275,12 +359,22 @@ export default function LeagueDetail() {
                       </Avatar>
                       <span className="font-medium text-sm">{m.username}</span>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                       {m.is_bot && (
                         <Badge variant="secondary" className="text-xs">CPU</Badge>
                       )}
                       {m.user_id === league.commissioner_id && (
                         <Badge variant="warning" className="text-xs">Commissioner</Badge>
+                      )}
+                      {isCommissioner && league.draft_status === 'pre_draft' && m.user_id !== league.commissioner_id && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowRemoveDialog(m); }}
+                        >
+                          <UserMinus className="h-4 w-4" />
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -305,6 +399,69 @@ export default function LeagueDetail() {
           </CardContent>
         </Card>
       </div>
+      {/* Leave league confirmation dialog */}
+      <Dialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Leave League</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to leave {league.name}? You can rejoin later with the invite code.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLeaveDialog(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleLeaveLeague}>Leave</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove member confirmation dialog */}
+      <Dialog open={!!showRemoveDialog} onOpenChange={(open) => !open && setShowRemoveDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Member</DialogTitle>
+            <DialogDescription>
+              Remove {showRemoveDialog?.username} from {league.name}?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRemoveDialog(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleRemoveMember}>Remove</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit league settings dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit League Settings</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditLeague} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">League Name</Label>
+              <Input id="edit-name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-team-count">Team Count (4-20)</Label>
+              <Input id="edit-team-count" type="number" min={4} max={20} value={editTeamCount} onChange={(e) => setEditTeamCount(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-roster-size">Roster Size</Label>
+              <Input id="edit-roster-size" type="number" min={1} value={editRosterSize} onChange={(e) => setEditRosterSize(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-draft-timer">Draft Timer (seconds per pick)</Label>
+              <Input id="edit-draft-timer" type="number" min={15} max={300} value={editDraftTimer} onChange={(e) => setEditDraftTimer(e.target.value)} />
+              <p className="text-xs text-muted-foreground">Players will be auto-picked when the timer expires (15-300s)</p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setShowEditDialog(false)}>Cancel</Button>
+              <Button type="submit">Save Changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

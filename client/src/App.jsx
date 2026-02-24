@@ -1,11 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import AppLayout from './components/layout/AppLayout';
 import LeagueLayout from './components/layout/LeagueLayout';
 import AdminLayout from './components/layout/AdminLayout';
+import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -23,6 +24,11 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminLeagues from './pages/admin/AdminLeagues';
 import AdminLeagueDetail from './pages/admin/AdminLeagueDetail';
 import AdminTournament from './pages/admin/AdminTournament';
+
+function HomeRedirect() {
+  const { user } = useAuth();
+  return user ? <Navigate to="/dashboard" replace /> : <Home />;
+}
 
 function App() {
   return (
@@ -62,7 +68,7 @@ function App() {
             </Route>
 
             {/* Fallback */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<HomeRedirect />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </BrowserRouter>

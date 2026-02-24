@@ -85,4 +85,24 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// DELETE /api/leagues/:id/members/me — leave a league (non-commissioner, pre_draft)
+router.delete('/:id/members/me', async (req, res) => {
+  try {
+    await leagueService.leaveLeague(req.params.id, req.user.id);
+    return res.status(200).json({ message: 'Left league' });
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/leagues/:id/members/:userId — remove a member (commissioner only, pre_draft)
+router.delete('/:id/members/:userId', async (req, res) => {
+  try {
+    await leagueService.removeMemberByCommissioner(req.params.id, req.params.userId, req.user.id);
+    return res.status(200).json({ message: 'Member removed' });
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

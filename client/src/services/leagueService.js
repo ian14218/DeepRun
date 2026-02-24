@@ -33,3 +33,13 @@ export async function fillWithBots(id) {
   const res = await api.post(`/api/leagues/${id}/fill-bots`);
   return res.data;
 }
+
+export async function leaveLeague(id) {
+  const res = await api.delete(`/api/leagues/${id}/members/me`);
+  return res.data;
+}
+
+export async function removeMember(leagueId, userId) {
+  const res = await api.delete(`/api/leagues/${leagueId}/members/${userId}`);
+  return res.data;
+}

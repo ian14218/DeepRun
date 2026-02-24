@@ -102,6 +102,14 @@ async function setMemberDraftPositions(assignments) {
   }
 }
 
+async function removeMember(leagueId, userId) {
+  const result = await pool.query(
+    `DELETE FROM league_members WHERE league_id = $1 AND user_id = $2 RETURNING *`,
+    [leagueId, userId]
+  );
+  return result.rows[0] || null;
+}
+
 module.exports = {
   create,
   findById,
@@ -114,4 +122,5 @@ module.exports = {
   getMemberCount,
   setDraftStatus,
   setMemberDraftPositions,
+  removeMember,
 };

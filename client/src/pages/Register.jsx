@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 import DeepRunLogo from '../components/DeepRunLogo';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,22 +9,34 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 
 export default function Register() {
+  useDocumentTitle('Create Account');
   const { register } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  function validateEmail(value) {
+    if (!value) return 'Email is required';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Invalid email format';
+    return '';
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
 
-    if (!username || !email || !password) {
-      setError('All fields are required.');
-      return;
-    }
+    const errors = {};
+    if (!username.trim()) errors.username = 'Username is required';
+    const emailErr = validateEmail(email);
+    if (emailErr) errors.email = emailErr;
+    if (!password) errors.password = 'Password is required';
+    else if (password.length < 6) errors.password = 'Password must be at least 6 characters';
+    if (Object.keys(errors).length) { setFieldErrors(errors); return; }
+    setFieldErrors({});
 
     setLoading(true);
     try {
@@ -67,6 +80,7 @@ export default function Register() {
                 autoComplete="username"
                 placeholder="Choose a username"
               />
+              {fieldErrors.username && <p className="text-xs text-destructive">{fieldErrors.username}</p>}
             </div>
 
             <div className="space-y-2">
@@ -76,9 +90,11 @@ export default function Register() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => { const err = validateEmail(email); setFieldErrors((p) => ({ ...p, email: err })); }}
                 autoComplete="email"
                 placeholder="you@example.com"
               />
+              {fieldErrors.email && <p className="text-xs text-destructive">{fieldErrors.email}</p>}
             </div>
 
             <div className="space-y-2">
@@ -89,8 +105,12 @@ export default function Register() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
-                placeholder="Create a password"
+                placeholder="Create a password (min 6 characters)"
               />
+              {password && password.length < 6 && (
+                <p className="text-xs text-muted-foreground">{password.length}/6 characters minimum</p>
+              )}
+              {fieldErrors.password && <p className="text-xs text-destructive">{fieldErrors.password}</p>}
             </div>
 
             <Button type="submit" disabled={loading} className="w-full">
