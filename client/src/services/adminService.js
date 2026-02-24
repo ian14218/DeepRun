@@ -43,3 +43,7 @@ export function getAdminPlayers(search = '', team = '', page = 1, limit = 20) {
 export function simulateTournamentRound() {
   return api.post('/api/admin/tournament/simulate-round').then((r) => r.data);
 }
+
+export function resetSimulation(includeDrafts = false) {
+  return api.post('/api/admin/tournament/reset-simulation', { includeDrafts }).then((r) => r.data);
+}

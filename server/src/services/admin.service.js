@@ -171,4 +171,39 @@ async function getTournamentPlayers(search = '', team = '', page = 1, limit = 20
   return { players: result.rows, total, page, limit };
 }
 
-module.exports = { getStats, getAllLeagues, getLeagueDetail, deleteLeague, resetDraft, getTournamentTeams, getTournamentPlayers };
+async function resetSimulation({ includeDrafts = false } = {}) {
+  const stats = await pool.query('DELETE FROM player_game_stats');
+
+  const teams = await pool.query(
+    `UPDATE tournament_teams
+     SET is_eliminated = false, eliminated_in_round = NULL, wins = 0
+     WHERE is_eliminated = true OR wins > 0`
+  );
+
+  const players = await pool.query(
+    `UPDATE players SET is_eliminated = false WHERE is_eliminated = true`
+  );
+
+  const result = {
+    deletedStats: stats.rowCount,
+    resetTeams: teams.rowCount,
+    resetPlayers: players.rowCount,
+  };
+
+  if (includeDrafts) {
+    const picks = await pool.query('DELETE FROM draft_picks');
+    const members = await pool.query(
+      `UPDATE league_members SET draft_position = NULL WHERE draft_position IS NOT NULL`
+    );
+    const leagues = await pool.query(
+      `UPDATE leagues SET draft_status = 'pre_draft' WHERE draft_status != 'pre_draft'`
+    );
+    result.deletedPicks = picks.rowCount;
+    result.resetMembers = members.rowCount;
+    result.resetLeagues = leagues.rowCount;
+  }
+
+  return result;
+}
+
+module.exports = { getStats, getAllLeagues, getLeagueDetail, deleteLeague, resetDraft, resetSimulation, getTournamentTeams, getTournamentPlayers };

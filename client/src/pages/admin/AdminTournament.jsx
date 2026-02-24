@@ -6,7 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { getAdminTeams, getAdminPlayers, simulateTournamentRound } from '../../services/adminService';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { getAdminTeams, getAdminPlayers, simulateTournamentRound, resetSimulation } from '../../services/adminService';
 import { toast } from 'sonner';
 import TeamLogo from '../../components/TeamLogo';
 
@@ -15,6 +16,9 @@ export default function AdminTournament() {
   const [teamsLoading, setTeamsLoading] = useState(true);
 
   const [simulating, setSimulating] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [includeDrafts, setIncludeDrafts] = useState(false);
 
   const [playerData, setPlayerData] = useState({ players: [], total: 0, page: 1, limit: 20 });
   const [playerSearch, setPlayerSearch] = useState('');
@@ -59,6 +63,25 @@ export default function AdminTournament() {
     }
   }
 
+  async function handleResetSimulation() {
+    setResetting(true);
+    try {
+      const result = await resetSimulation(includeDrafts);
+      const msg = includeDrafts
+        ? `Reset: ${result.deletedStats} stats, ${result.resetTeams} teams, ${result.deletedPicks} picks, ${result.resetLeagues} leagues`
+        : `Reset: ${result.deletedStats} stats, ${result.resetTeams} teams, ${result.resetPlayers} players`;
+      toast.success(msg);
+      const updatedTeams = await getAdminTeams();
+      setTeams(updatedTeams);
+      setResetOpen(false);
+      setIncludeDrafts(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Reset failed');
+    } finally {
+      setResetting(false);
+    }
+  }
+
   const playerTotalPages = Math.ceil(playerData.total / playerData.limit);
 
   return (
@@ -76,9 +99,18 @@ export default function AdminTournament() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">Tournament Teams ({teams.length})</CardTitle>
-                <Button onClick={handleSimulateRound} disabled={simulating} size="sm">
-                  {simulating ? 'Simulating...' : 'Simulate Round'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={handleSimulateRound} disabled={simulating} size="sm">
+                    {simulating ? 'Simulating...' : 'Simulate Round'}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setResetOpen(true)}
+                  >
+                    Reset Simulation
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -238,6 +270,42 @@ export default function AdminTournament() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Simulation</DialogTitle>
+            <DialogDescription>
+              This will clear all game stats and restore every team and player to active status.
+              You can then re-simulate with fresh random results.
+            </DialogDescription>
+          </DialogHeader>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeDrafts}
+              onChange={(e) => setIncludeDrafts(e.target.checked)}
+              className="rounded"
+            />
+            <span className="text-sm">
+              Also reset all drafts back to pre-draft
+            </span>
+          </label>
+          {includeDrafts && (
+            <p className="text-xs text-destructive">
+              This will delete all draft picks and reset every league to pre-draft status.
+            </p>
+          )}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button variant="destructive" onClick={handleResetSimulation} disabled={resetting}>
+              {resetting ? 'Resetting...' : 'Reset'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

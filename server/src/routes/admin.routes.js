@@ -118,6 +118,16 @@ router.get('/tournament/players', async (req, res) => {
   }
 });
 
+router.post('/tournament/reset-simulation', async (req, res) => {
+  try {
+    const { includeDrafts } = req.body;
+    const result = await adminService.resetSimulation({ includeDrafts: !!includeDrafts });
+    res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 router.post('/tournament/simulate-round', async (req, res) => {
   try {
     const result = await simulationService.simulateRound();
