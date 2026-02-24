@@ -98,6 +98,19 @@ function buildFinalRounds(regionRounds) {
 
 // ── Rendering components ───────────────────────────────────────
 
+// Border + background colors keyed by drafted player count
+const DRAFT_COLORS = {
+  1: { border: 'border-blue-500',    borderDim: 'border-blue-500/40',    bg: 'bg-blue-500/10',   bgDim: 'bg-blue-500/5',   badge: 'bg-blue-500' },
+  2: { border: 'border-green-500',   borderDim: 'border-green-500/40',   bg: 'bg-green-500/10',  bgDim: 'bg-green-500/5',  badge: 'bg-green-500' },
+  3: { border: 'border-red-500',     borderDim: 'border-red-500/40',     bg: 'bg-red-500/10',    bgDim: 'bg-red-500/5',    badge: 'bg-red-500' },
+  4: { border: 'border-purple-500',  borderDim: 'border-purple-500/40',  bg: 'bg-purple-500/10', bgDim: 'bg-purple-500/5', badge: 'bg-purple-500' },
+  5: { border: 'border-yellow-500',  borderDim: 'border-yellow-500/40',  bg: 'bg-yellow-500/10', bgDim: 'bg-yellow-500/5', badge: 'bg-yellow-500' },
+};
+
+function getDraftStyle(count) {
+  return DRAFT_COLORS[count] || DRAFT_COLORS[5]; // 5+ uses gold
+}
+
 function TeamSlot({ team, draftedCount }) {
   if (!team) {
     return (
@@ -109,12 +122,15 @@ function TeamSlot({ team, draftedCount }) {
 
   const hasDrafted = draftedCount > 0;
   const eliminated = team.is_eliminated;
+  const colors = hasDrafted ? getDraftStyle(draftedCount) : null;
 
   return (
     <div className={cn(
       'flex items-center gap-1.5 border rounded px-2 text-xs h-full w-full transition-colors',
-      hasDrafted && !eliminated && 'border-primary bg-primary/10',
-      hasDrafted && eliminated && 'border-primary/40 bg-primary/5',
+      hasDrafted && !eliminated && colors.border,
+      hasDrafted && !eliminated && colors.bg,
+      hasDrafted && eliminated && colors.borderDim,
+      hasDrafted && eliminated && colors.bgDim,
       !hasDrafted && 'border-border bg-card',
       eliminated && 'opacity-50',
     )}>
@@ -126,7 +142,7 @@ function TeamSlot({ team, draftedCount }) {
         {team.name}
       </span>
       {hasDrafted && (
-        <Badge variant="default" className="ml-auto text-[10px] px-1 py-0 h-4 shrink-0">
+        <Badge className={cn('ml-auto text-[10px] px-1 py-0 h-4 shrink-0 text-white', colors.badge)}>
           {draftedCount}
         </Badge>
       )}
