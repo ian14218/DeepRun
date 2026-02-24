@@ -32,7 +32,7 @@ export default function Standings() {
         <Link to={`/leagues/${id}`} className="text-primary hover:underline text-sm">
           ← Back to League
         </Link>
-        <h1 className="text-2xl font-bold">Standings</h1>
+        <h1 className="text-3xl font-bold">Standings</h1>
       </div>
 
       {error && <p className="text-destructive mb-4">{error}</p>}

@@ -86,7 +86,7 @@ export default function AdminTournament() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Tournament Management</h1>
+      <h1 className="text-3xl font-bold mb-6">Tournament Management</h1>
 
       <Tabs defaultValue="teams">
         <TabsList className="mb-4">

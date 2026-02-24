@@ -35,10 +35,10 @@ const R64_SEED_MATCHUPS = [
 
 const REGIONS = ['East', 'Midwest', 'South', 'West'];
 
-// Final Four cross-region pairings (standard NCAA bracket)
+// Final Four cross-region pairings (must match BracketView.jsx)
 const FF_PAIRINGS = [
-  ['East', 'Midwest'],
-  ['South', 'West'],
+  ['East', 'West'],
+  ['South', 'Midwest'],
 ];
 
 function randomPlayerPoints() {
@@ -46,11 +46,25 @@ function randomPlayerPoints() {
   return Math.floor(Math.random() * 31);
 }
 
-async function getTeamsByRegion() {
+async function getActiveTeamsByRegion() {
   const result = await pool.query(
     `SELECT id, name, seed, region, is_eliminated, wins
      FROM tournament_teams
      WHERE is_eliminated = false
+     ORDER BY region, seed`
+  );
+  const byRegion = {};
+  for (const team of result.rows) {
+    if (!byRegion[team.region]) byRegion[team.region] = [];
+    byRegion[team.region].push(team);
+  }
+  return byRegion;
+}
+
+async function getAllTeamsByRegion() {
+  const result = await pool.query(
+    `SELECT id, name, seed, region, is_eliminated, wins
+     FROM tournament_teams
      ORDER BY region, seed`
   );
   const byRegion = {};
@@ -156,10 +170,9 @@ async function simulateRound(roundNum) {
 
   console.log(`\nSimulating ${roundName}...\n`);
 
-  const byRegion = await getTeamsByRegion();
-
   if (roundNum === 1) {
     // Round of 64: pair by seeds within each region
+    const byRegion = await getActiveTeamsByRegion();
     for (const region of REGIONS) {
       const regionTeams = byRegion[region] || [];
       console.log(`--- ${region} Region ---`);
@@ -175,27 +188,55 @@ async function simulateRound(roundNum) {
       }
     }
   } else if (roundNum >= 2 && roundNum <= 4) {
-    // Rounds 2-4: pair surviving teams within each region by seed (lowest vs highest)
+    // Rounds 2-4: follow bracket structure within each region.
+    // Reconstruct the bracket tree from R64 seed matchups so that
+    // e.g. the winner of 1v16 plays the winner of 8v9 (not random).
+    const allByRegion = await getAllTeamsByRegion();
+
     for (const region of REGIONS) {
-      const regionTeams = (byRegion[region] || []).sort((a, b) => a.seed - b.seed);
+      const regionTeams = allByRegion[region] || [];
+      const bySeed = {};
+      regionTeams.forEach((t) => { bySeed[t.seed] = t; });
+
       console.log(`--- ${region} Region ---`);
 
-      if (regionTeams.length % 2 !== 0) {
-        console.log(`  WARNING: Odd number of teams (${regionTeams.length}) in ${region}. Round may be incomplete.`);
+      // Start with R64 winners in bracket order
+      let bracketSlots = R64_SEED_MATCHUPS.map(([seedA, seedB]) => {
+        const teamA = bySeed[seedA];
+        const teamB = bySeed[seedB];
+        if (teamA && teamA.wins >= 1) return teamA;
+        if (teamB && teamB.wins >= 1) return teamB;
+        return null;
+      });
+
+      // Advance through intermediate rounds to reach current round's matchups
+      for (let r = 2; r < roundNum; r++) {
+        const nextSlots = [];
+        for (let i = 0; i < bracketSlots.length; i += 2) {
+          const a = bracketSlots[i];
+          const b = bracketSlots[i + 1];
+          if (a && a.wins >= r) nextSlots.push(a);
+          else if (b && b.wins >= r) nextSlots.push(b);
+          else nextSlots.push(null);
+        }
+        bracketSlots = nextSlots;
       }
 
-      // Pair top seed vs bottom seed, second vs second-to-last, etc.
-      const half = Math.floor(regionTeams.length / 2);
-      for (let i = 0; i < half; i++) {
-        const teamA = regionTeams[i];
-        const teamB = regionTeams[regionTeams.length - 1 - i];
+      // Pair adjacent bracket slots for the current round
+      for (let i = 0; i < bracketSlots.length; i += 2) {
+        const teamA = bracketSlots[i];
+        const teamB = bracketSlots[i + 1];
+        if (!teamA || !teamB) {
+          console.log(`  SKIP: Missing team in bracket slot`);
+          continue;
+        }
         await simulateGame(teamA, teamB, roundNum, `r${roundNum}-${region}-${teamA.seed}v${teamB.seed}`);
       }
     }
   } else if (roundNum === 5) {
     // Final Four: cross-region matchups
+    const byRegion = await getActiveTeamsByRegion();
     console.log('--- Final Four ---');
-    const allSurviving = [];
     for (const [regionA, regionB] of FF_PAIRINGS) {
       const teamA = (byRegion[regionA] || [])[0];
       const teamB = (byRegion[regionB] || [])[0];
@@ -203,11 +244,11 @@ async function simulateRound(roundNum) {
         console.log(`  SKIP: Missing region winner for ${regionA} or ${regionB}`);
         continue;
       }
-      const winner = await simulateGame(teamA, teamB, roundNum, `r${roundNum}-${regionA}v${regionB}`);
-      allSurviving.push(winner);
+      await simulateGame(teamA, teamB, roundNum, `r${roundNum}-${regionA}v${regionB}`);
     }
   } else if (roundNum === 6) {
     // Championship: last 2 standing
+    const byRegion = await getActiveTeamsByRegion();
     const allTeams = Object.values(byRegion).flat();
     if (allTeams.length !== 2) {
       console.log(`  Cannot simulate championship: ${allTeams.length} teams remaining (need 2).`);

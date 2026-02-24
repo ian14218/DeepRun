@@ -35,7 +35,7 @@ export default function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 h-14 bg-card/95 backdrop-blur border-b border-border supports-[backdrop-filter]:bg-card/80">
-      <div className="mx-auto max-w-7xl h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+      <div className="mx-auto max-w-[1600px] h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         {/* Logo */}
         <Link to="/dashboard" className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
           <Trophy className="h-5 w-5 text-accent" />

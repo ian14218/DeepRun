@@ -148,7 +148,7 @@ export default function DraftRoom() {
   if (draftState.status === 'pre_draft') {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-bold">{league.name} — Draft Room</h1>
+        <h1 className="text-2xl font-bold">{league.name} — Draft Room</h1>
         {error && (
           <div role="alert" className="p-3 bg-destructive/10 text-destructive rounded-md border border-destructive/20 text-sm">
             {error}
@@ -187,7 +187,7 @@ export default function DraftRoom() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <h1 className="text-xl font-bold">{league.name} — Draft Room</h1>
+        <h1 className="text-2xl font-bold">{league.name} — Draft Room</h1>
         <Badge variant="secondary" className="text-xs w-fit">
           Pick {draftState.picks.length + 1} of {totalPicks}
         </Badge>

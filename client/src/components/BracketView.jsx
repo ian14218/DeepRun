@@ -10,14 +10,14 @@ const SEED_MATCHUPS = [
 ];
 
 // Layout constants (px)
-const SLOT_H = 28;
-const SLOT_W = 156;
-const PAIR_GAP = 4;      // gap between two teams in a matchup
+const SLOT_H = 34;
+const SLOT_W = 192;
+const PAIR_GAP = 6;      // gap between two teams in a matchup
 const MATCHUP_GAP = 16;  // gap between matchups
-const CONN_W = 28;       // width of connector SVG columns
+const CONN_W = 32;       // width of connector SVG columns
 const REGION_GAP = 48;   // vertical gap between stacked regions
-const LABEL_H = 22;      // space reserved above bracket for round labels
-const CENTER_W = 164;    // width of center Final Four / Championship column
+const LABEL_H = 24;      // space reserved above bracket for round labels
+const CENTER_W = 200;    // width of center Final Four / Championship column
 
 const MATCHUP_H = 2 * SLOT_H + PAIR_GAP; // height of one matchup pair
 const REGION_H = 8 * MATCHUP_H + 7 * MATCHUP_GAP; // total bracket height per region
@@ -102,7 +102,7 @@ function TeamSlot({ team, draftedCount }) {
   if (!team) {
     return (
       <div className="flex items-center gap-1.5 border border-dashed border-border/60 rounded px-2 bg-muted/20 h-full w-full">
-        <span className="text-[11px] text-muted-foreground/60 italic">TBD</span>
+        <span className="text-xs text-muted-foreground/60 italic">TBD</span>
       </div>
     );
   }
@@ -112,21 +112,21 @@ function TeamSlot({ team, draftedCount }) {
 
   return (
     <div className={cn(
-      'flex items-center gap-1.5 border rounded px-2 text-[11px] h-full w-full transition-colors',
+      'flex items-center gap-1.5 border rounded px-2 text-xs h-full w-full transition-colors',
       hasDrafted && !eliminated && 'border-primary bg-primary/10',
       hasDrafted && eliminated && 'border-primary/40 bg-primary/5',
       !hasDrafted && 'border-border bg-card',
       eliminated && 'opacity-50',
     )}>
-      <span className="text-muted-foreground font-mono w-4 text-right shrink-0 text-[10px]">
+      <span className="text-muted-foreground font-mono w-5 text-right shrink-0 text-[11px]">
         {team.seed}
       </span>
-      <TeamLogo externalId={team.external_id} teamName={team.name} size={14} />
+      <TeamLogo externalId={team.external_id} teamName={team.name} size={16} />
       <span className={cn('truncate font-medium', eliminated && 'line-through')}>
         {team.name}
       </span>
       {hasDrafted && (
-        <Badge variant="default" className="ml-auto text-[9px] px-1 py-0 h-3.5 shrink-0">
+        <Badge variant="default" className="ml-auto text-[10px] px-1 py-0 h-4 shrink-0">
           {draftedCount}
         </Badge>
       )}
@@ -139,7 +139,7 @@ function RoundCol({ slots, positions, draftedCountByTeam, label }) {
     <div className="relative shrink-0" style={{ width: SLOT_W, height: REGION_H }}>
       {label && (
         <div
-          className="absolute left-0 right-0 text-center text-[10px] text-muted-foreground/70 font-medium"
+          className="absolute left-0 right-0 text-center text-[11px] text-muted-foreground/70 font-medium"
           style={{ top: -LABEL_H }}
         >
           {label}
@@ -266,11 +266,11 @@ function CenterColumn({ ff, champ, champion, draftedCountByTeam }) {
     >
       {/* FF Game 1: East winner vs West winner */}
       <div className="flex flex-col items-center gap-1 mb-8">
-        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
           Final Four
         </span>
         <CenterSlot team={ff[0]} draftedCountByTeam={draftedCountByTeam} />
-        <span className="text-[10px] text-muted-foreground leading-none">vs</span>
+        <span className="text-[11px] text-muted-foreground leading-none">vs</span>
         <CenterSlot team={ff[1]} draftedCountByTeam={draftedCountByTeam} />
       </div>
 
@@ -278,11 +278,11 @@ function CenterColumn({ ff, champ, champion, draftedCountByTeam }) {
 
       {/* Championship */}
       <div className="flex flex-col items-center gap-1 my-4">
-        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
           Championship
         </span>
         <CenterSlot team={champ[0]} draftedCountByTeam={draftedCountByTeam} />
-        <span className="text-[10px] text-muted-foreground leading-none">vs</span>
+        <span className="text-[11px] text-muted-foreground leading-none">vs</span>
         <CenterSlot team={champ[1]} draftedCountByTeam={draftedCountByTeam} />
       </div>
 
@@ -291,7 +291,7 @@ function CenterColumn({ ff, champ, champion, draftedCountByTeam }) {
         <>
           <div className="w-px h-4 bg-border/40" />
           <div className="flex flex-col items-center gap-1 mt-2 mb-4 p-3 rounded-lg border-2 border-primary/30 bg-primary/5">
-            <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-primary uppercase tracking-wider">
               Champion
             </span>
             <CenterSlot team={champion} draftedCountByTeam={draftedCountByTeam} />
@@ -305,11 +305,11 @@ function CenterColumn({ ff, champ, champion, draftedCountByTeam }) {
 
       {/* FF Game 2: South winner vs Midwest winner */}
       <div className="flex flex-col items-center gap-1 mt-8">
-        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
           Final Four
         </span>
         <CenterSlot team={ff[2]} draftedCountByTeam={draftedCountByTeam} />
-        <span className="text-[10px] text-muted-foreground leading-none">vs</span>
+        <span className="text-[11px] text-muted-foreground leading-none">vs</span>
         <CenterSlot team={ff[3]} draftedCountByTeam={draftedCountByTeam} />
       </div>
     </div>

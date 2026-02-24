@@ -41,7 +41,7 @@ export default function LeagueSidebar({ leagueId, mobile = false }) {
   }
 
   return (
-    <nav className="flex flex-col gap-1 w-44 shrink-0 sticky top-20">
+    <nav className="flex flex-col gap-1 w-48 shrink-0 sticky top-20">
       <div className="bg-card rounded-lg border border-border p-2">
         {navItems.map(({ label, path, icon: Icon }) => {
           const to = `${base}/${path}`;

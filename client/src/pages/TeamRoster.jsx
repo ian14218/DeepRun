@@ -78,7 +78,7 @@ export default function TeamRoster() {
         <Link to={`/leagues/${leagueId}`} className="text-primary hover:underline text-sm">
           ← Back to League
         </Link>
-        <h1 className="text-2xl font-bold">
+        <h1 className="text-3xl font-bold">
           {isCurrentUser ? 'My Team' : `Team: ${memberName}`}
           {isCurrentUser && (
             <span className="ml-2 text-sm font-normal text-primary">(You)</span>

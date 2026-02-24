@@ -26,7 +26,7 @@ export default function Dashboard() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Your Leagues</h1>
+        <h1 className="text-3xl font-bold">Your Leagues</h1>
         <div className="flex gap-2">
           <Button asChild>
             <Link to="/leagues/create">
@@ -45,7 +45,7 @@ export default function Dashboard() {
 
       {/* Loading skeletons */}
       {loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {[1, 2, 3].map((i) => (
             <Card key={i}>
               <CardContent className="p-5 space-y-3">
@@ -87,7 +87,7 @@ export default function Dashboard() {
 
       {/* League cards grid */}
       {!loading && leagues.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {leagues.map((league) => {
             const status = STATUS_CONFIG[league.draft_status] || {
               label: league.draft_status,

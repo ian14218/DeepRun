@@ -140,7 +140,7 @@ export default function LeagueDetail() {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold">{league.name}</h1>
+            <h1 className="text-3xl font-bold">{league.name}</h1>
             <Badge variant={status.variant}>{status.label}</Badge>
           </div>
           <p className="text-sm text-muted-foreground">
