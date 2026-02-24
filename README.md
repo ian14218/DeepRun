@@ -1,4 +1,4 @@
-# MMFantasy
+# DeepRun
 
 A March Madness Fantasy League web app. Groups of 4–20 friends snake-draft NCAA tournament players, then track points across the tournament. The core strategy: the tournament is single-elimination, so players on teams that go deeper play more games and score more total points.
 
@@ -11,7 +11,7 @@ A March Madness Fantasy League web app. Groups of 4–20 friends snake-draft NCA
 ## Project Structure
 
 ```
-MMFantasy/
+DeepRun/
 ├── client/          # React/Vite frontend
 ├── server/          # Express/Node backend
 ├── database/        # PostgreSQL migrations & seeds

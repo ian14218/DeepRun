@@ -354,7 +354,7 @@ Use a free or affordable sports API that provides NCAA tournament player stats. 
 ## 8. Project Structure
 
 ```
-MMFantasy/
+DeepRun/
 ├── client/                    # React frontend (Vite)
 │   ├── src/
 │   │   ├── components/        # Reusable UI components
