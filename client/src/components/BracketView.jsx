@@ -102,7 +102,7 @@ function buildFinalRounds(regionRounds) {
 const DRAFT_COLORS = {
   1: { border: 'border-blue-500',    borderDim: 'border-blue-500/40',    bg: 'bg-blue-500/10',   bgDim: 'bg-blue-500/5',   badge: 'bg-blue-500' },
   2: { border: 'border-green-500',   borderDim: 'border-green-500/40',   bg: 'bg-green-500/10',  bgDim: 'bg-green-500/5',  badge: 'bg-green-500' },
-  3: { border: 'border-slate-300',    borderDim: 'border-slate-300/40',   bg: 'bg-slate-300/10',  bgDim: 'bg-slate-300/5',  badge: 'bg-slate-400' },
+  3: { border: 'border-orange-500',   borderDim: 'border-orange-500/40',  bg: 'bg-orange-500/10', bgDim: 'bg-orange-500/5', badge: 'bg-orange-500' },
   4: { border: 'border-purple-500',  borderDim: 'border-purple-500/40',  bg: 'bg-purple-500/10', bgDim: 'bg-purple-500/5', badge: 'bg-purple-500' },
   5: { border: 'border-yellow-500',  borderDim: 'border-yellow-500/40',  bg: 'bg-yellow-500/10', bgDim: 'bg-yellow-500/5', badge: 'bg-yellow-500' },
 };
