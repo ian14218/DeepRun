@@ -1,0 +1,3 @@
+-- Seed data placeholder
+-- Populate with actual NCAA tournament teams and players before the tournament.
+-- See database/seed_tournament.js for the automated seed script.

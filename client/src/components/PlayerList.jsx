@@ -1,0 +1,120 @@
+import { useState, useEffect } from 'react';
+import { getAvailablePlayers } from '../services/draftService';
+import { Search } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
+import TeamLogo from './TeamLogo';
+
+export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
+  const [players, setPlayers] = useState([]);
+  const [search, setSearch] = useState('');
+  const [teamFilter, setTeamFilter] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getAvailablePlayers()
+      .then((data) => setPlayers(data.players))
+      .catch(() => setPlayers([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const teams = [...new Set(players.map((p) => p.team_name))].sort();
+
+  const visible = players
+    .filter((p) => {
+      if (pickedPlayerIds.includes(p.id)) return false;
+      if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (teamFilter && p.team_name !== teamFilter) return false;
+      return true;
+    })
+    .sort((a, b) => (b.season_ppg || 0) - (a.season_ppg || 0));
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Available Players</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="flex flex-col max-h-[600px] lg:max-h-[calc(100vh-220px)]">
+      <CardHeader className="pb-3 space-y-3 shrink-0">
+        <CardTitle className="text-base">Available Players</CardTitle>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search players..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+        <select
+          value={teamFilter}
+          onChange={(e) => setTeamFilter(e.target.value)}
+          className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        >
+          <option value="">All teams</option>
+          {teams.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+      </CardHeader>
+      <CardContent className="p-0 flex-1 overflow-hidden">
+        <ScrollArea className="h-full">
+          <div className="divide-y divide-border">
+            {visible.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between px-4 py-2.5 hover:bg-secondary/50 transition-colors"
+              >
+                <div className="flex-1 min-w-0 mr-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium truncate">{p.name}</span>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                      {p.position}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                    <TeamLogo externalId={p.team_external_id} teamName={p.team_name} size={16} />
+                    <span className="truncate">{p.team_name}</span>
+                    <span>#{p.seed}</span>
+                    {p.season_ppg > 0 && (
+                      <span>{p.season_ppg} PPG</span>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant={canPick ? 'default' : 'ghost'}
+                  disabled={!canPick}
+                  onClick={() => onPick(p.id)}
+                  className="shrink-0 h-7 text-xs"
+                >
+                  Pick
+                </Button>
+              </div>
+            ))}
+            {visible.length === 0 && (
+              <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                No players found.
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </CardContent>
+    </Card>
+  );
+}
