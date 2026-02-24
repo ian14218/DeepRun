@@ -64,7 +64,9 @@ describe('PlayerList', () => {
     renderPlayerList();
     await waitFor(() => expect(screen.getByText('John Smith')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'UNC' } });
+    const selects = screen.getAllByRole('combobox');
+    const teamSelect = selects.find((s) => s.querySelector('option[value="UNC"]'));
+    fireEvent.change(teamSelect, { target: { value: 'UNC' } });
 
     expect(screen.queryByText('John Smith')).not.toBeInTheDocument();
     expect(screen.getByText('Bob Jones')).toBeInTheDocument();

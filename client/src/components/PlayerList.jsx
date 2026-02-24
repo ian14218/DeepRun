@@ -13,6 +13,7 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
   const [players, setPlayers] = useState([]);
   const [search, setSearch] = useState('');
   const [teamFilter, setTeamFilter] = useState('');
+  const [sortBy, setSortBy] = useState('ppg');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,11 +28,21 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
   const visible = players
     .filter((p) => {
       if (pickedPlayerIds.includes(p.id)) return false;
+      if ((p.season_ppg || 0) < 3) return false;
       if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
       if (teamFilter && p.team_name !== teamFilter) return false;
       return true;
     })
-    .sort((a, b) => (b.season_ppg || 0) - (a.season_ppg || 0));
+    .sort((a, b) => {
+      if (sortBy === 'seed') {
+        const seedDiff = (a.seed || 99) - (b.seed || 99);
+        if (seedDiff !== 0) return seedDiff;
+        const teamCmp = (a.team_name || '').localeCompare(b.team_name || '');
+        if (teamCmp !== 0) return teamCmp;
+        return (b.season_ppg || 0) - (a.season_ppg || 0);
+      }
+      return (b.season_ppg || 0) - (a.season_ppg || 0);
+    });
 
   if (loading) {
     return (
@@ -61,16 +72,26 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
             className="pl-8"
           />
         </div>
-        <select
-          value={teamFilter}
-          onChange={(e) => setTeamFilter(e.target.value)}
-          className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-        >
-          <option value="">All teams</option>
-          {teams.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
+        <div className="flex gap-2">
+          <select
+            value={teamFilter}
+            onChange={(e) => setTeamFilter(e.target.value)}
+            className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
+            <option value="">All teams</option>
+            {teams.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="w-24 h-9 rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
+            <option value="ppg">By PPG</option>
+            <option value="seed">By Seed</option>
+          </select>
+        </div>
       </CardHeader>
       <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">
         <ScrollArea className="h-full">
