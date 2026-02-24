@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getLeagues } from '../services/leagueService';
-import { Menu, LogOut, ChevronDown, Trophy, Shield } from 'lucide-react';
+import { Menu, LogOut, ChevronDown, Shield } from 'lucide-react';
+import DeepRunLogo from './DeepRunLogo';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -38,10 +39,10 @@ export default function Navbar() {
       <div className="mx-auto max-w-[1600px] h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         {/* Logo */}
         <Link to="/dashboard" className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
-          <Trophy className="h-5 w-5 text-accent" />
-          <span className="text-lg font-bold tracking-tight">
-            <span className="text-accent">MM</span>
-            <span className="text-foreground">Fantasy</span>
+          <DeepRunLogo className="h-5 w-5 text-accent" />
+          <span className="text-xl font-bold tracking-tight">
+            <span className="text-accent">Deep</span>
+            <span className="text-foreground">Run</span>
           </span>
         </Link>
 

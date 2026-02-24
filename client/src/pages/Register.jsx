@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Trophy } from 'lucide-react';
+import DeepRunLogo from '../components/DeepRunLogo';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,10 +41,10 @@ export default function Register() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-2 pb-2">
           <div className="flex items-center justify-center gap-2">
-            <Trophy className="h-7 w-7 text-accent" />
+            <DeepRunLogo className="h-7 w-7 text-accent" />
             <h1 className="text-2xl font-bold tracking-tight">
-              <span className="text-accent">MM</span>
-              <span className="text-foreground">Fantasy</span>
+              <span className="text-accent">Deep</span>
+              <span className="text-foreground">Run</span>
             </h1>
           </div>
           <h2 className="text-lg font-semibold text-foreground">Create Account</h2>

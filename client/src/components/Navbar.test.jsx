@@ -29,7 +29,7 @@ beforeEach(() => {
 describe('Navbar', () => {
   it('shows a link to the dashboard as the app logo/name', () => {
     renderNavbar();
-    const link = screen.getByRole('link', { name: /mm\s*fantasy/i });
+    const link = screen.getByRole('link', { name: /deep\s*run/i });
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute('href', '/dashboard');
   });
