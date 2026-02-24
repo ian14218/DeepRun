@@ -17,6 +17,7 @@ import Standings from './pages/Standings';
 import MyTeam from './pages/MyTeam';
 import TeamRoster from './pages/TeamRoster';
 import Scoreboard from './pages/Scoreboard';
+import Bracket from './pages/Bracket';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminLeagues from './pages/admin/AdminLeagues';
@@ -47,6 +48,7 @@ function App() {
                 <Route path="my-team" element={<MyTeam />} />
                 <Route path="team/:memberId" element={<TeamRoster />} />
                 <Route path="scoreboard" element={<Scoreboard />} />
+                <Route path="bracket" element={<Bracket />} />
               </Route>
 
               {/* Admin — wrapped in AdminRoute guard + AdminLayout */}

@@ -14,3 +14,8 @@ export async function getScoreboard(leagueId) {
   const res = await api.get(`/api/leagues/${leagueId}/scoreboard`);
   return res.data;
 }
+
+export async function getTournamentTeams() {
+  const res = await api.get('/api/tournaments/teams');
+  return res.data;
+}

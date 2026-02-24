@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getLeague, fillWithBots } from '../services/leagueService';
 import { getStandings, getTeamRoster } from '../services/standingsService';
 import PlayerRow from '../components/PlayerRow';
-import { BarChart3, Users, Swords, Tv, Copy, Bot, Play } from 'lucide-react';
+import { BarChart3, Users, Swords, Tv, Trophy, Copy, Bot, Play } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ const NAV_CARDS = [
   { label: 'My Team', description: 'Manage your roster', path: 'my-team', icon: Users },
   { label: 'Draft', description: 'Draft room', path: 'draft', icon: Swords },
   { label: 'Scoreboard', description: 'Live game scores', path: 'scoreboard', icon: Tv },
+  { label: 'Bracket', description: 'Tournament bracket', path: 'bracket', icon: Trophy },
 ];
 
 export default function LeagueDetail() {
@@ -114,8 +115,8 @@ export default function LeagueDetail() {
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-6 w-20" />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {[1, 2, 3, 4, 5].map((i) => (
             <Skeleton key={i} className="h-24 rounded-lg" />
           ))}
         </div>
@@ -188,7 +189,7 @@ export default function LeagueDetail() {
       )}
 
       {/* Navigation cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {NAV_CARDS.map(({ label, description, path, icon: Icon }) => (
           <Link key={path} to={`/leagues/${id}/${path}`}>
             <Card className="hover:border-primary/40 transition-colors cursor-pointer h-full">

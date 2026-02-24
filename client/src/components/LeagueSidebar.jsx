@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, Users, Swords, Tv } from 'lucide-react';
+import { BarChart3, Users, Swords, Tv, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -7,6 +7,7 @@ const navItems = [
   { label: 'My Team', path: 'my-team', icon: Users },
   { label: 'Draft', path: 'draft', icon: Swords },
   { label: 'Scoreboard', path: 'scoreboard', icon: Tv },
+  { label: 'Bracket', path: 'bracket', icon: Trophy },
 ];
 
 export default function LeagueSidebar({ leagueId, mobile = false }) {
