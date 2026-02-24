@@ -15,6 +15,11 @@ export async function makePick(leagueId, playerId) {
   return res.data;
 }
 
+export async function controlDraftTimer(leagueId, action, seconds) {
+  const res = await api.post(`/api/leagues/${leagueId}/draft/timer-control`, { action, seconds });
+  return res.data;
+}
+
 export async function getAvailablePlayers() {
   const res = await api.get('/api/players', { params: { limit: 1000 } });
   return res.data;

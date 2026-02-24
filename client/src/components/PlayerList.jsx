@@ -49,7 +49,7 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
   }
 
   return (
-    <Card className="flex flex-col max-h-[600px] lg:max-h-[calc(100vh-220px)]">
+    <Card className="flex flex-col h-[450px] lg:h-full">
       <CardHeader className="pb-3 space-y-3 shrink-0">
         <CardTitle className="text-base">Available Players</CardTitle>
         <div className="relative">
@@ -72,27 +72,27 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
           ))}
         </select>
       </CardHeader>
-      <CardContent className="p-0 flex-1 overflow-hidden">
+      <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">
         <ScrollArea className="h-full">
           <div className="divide-y divide-border">
             {visible.map((p) => (
               <div
                 key={p.id}
-                className="flex items-center justify-between px-4 py-2.5 hover:bg-secondary/50 transition-colors"
+                className="flex items-center justify-between px-3 py-2 hover:bg-secondary/50 transition-colors gap-2"
               >
-                <div className="flex-1 min-w-0 mr-2">
-                  <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
                     <span className="text-sm font-medium truncate">{p.name}</span>
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
                       {p.position}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                    <TeamLogo externalId={p.team_external_id} teamName={p.team_name} size={16} />
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                    <TeamLogo externalId={p.team_external_id} teamName={p.team_name} size={14} />
                     <span className="truncate">{p.team_name}</span>
-                    <span>#{p.seed}</span>
+                    <span className="shrink-0">#{p.seed}</span>
                     {p.season_ppg > 0 && (
-                      <span>{p.season_ppg} PPG</span>
+                      <span className="shrink-0">{p.season_ppg} PPG</span>
                     )}
                   </div>
                 </div>
@@ -101,14 +101,14 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
                   variant={canPick ? 'default' : 'ghost'}
                   disabled={!canPick}
                   onClick={() => onPick(p.id)}
-                  className="shrink-0 h-7 text-xs"
+                  className="shrink-0 h-7 text-xs px-2"
                 >
                   Pick
                 </Button>
               </div>
             ))}
             {visible.length === 0 && (
-              <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              <div className="px-3 py-8 text-center text-sm text-muted-foreground">
                 No players found.
               </div>
             )}

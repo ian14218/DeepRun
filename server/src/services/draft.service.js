@@ -3,6 +3,158 @@ const leagueModel = require('../models/league.model');
 const draftPickModel = require('../models/draftPick.model');
 const playerModel = require('../models/player.model');
 
+// ─── Draft timers (in-memory) ────────────────────────────────────────────────
+const draftTimers = new Map(); // leagueId → { timeout, expiresAt, paused, remainingOnPause, io, disabled }
+
+function clearDraftTimer(leagueId) {
+  const existing = draftTimers.get(leagueId);
+  if (existing) {
+    clearTimeout(existing.timeout);
+    draftTimers.delete(leagueId);
+  }
+}
+
+function startDraftTimer(leagueId, seconds, io) {
+  clearDraftTimer(leagueId);
+
+  // If seconds is 0 or falsy, timer is disabled — don't set a timeout
+  if (!seconds) {
+    if (io) {
+      io.to(`league:${leagueId}`).emit('draft:timer-disabled', {});
+    }
+    draftTimers.set(leagueId, { timeout: null, expiresAt: null, paused: false, remainingOnPause: null, io, disabled: true });
+    return;
+  }
+
+  const expiresAt = Date.now() + seconds * 1000;
+
+  // Emit timer start to clients
+  if (io) {
+    io.to(`league:${leagueId}`).emit('draft:timer', {
+      seconds_remaining: seconds,
+      expires_at: expiresAt,
+    });
+  }
+
+  const timeout = setTimeout(async () => {
+    draftTimers.delete(leagueId);
+    try {
+      await autoPickOnTimeout(leagueId, io);
+    } catch {
+      // Timer expired but auto-pick failed — next action will reset state
+    }
+  }, seconds * 1000);
+
+  draftTimers.set(leagueId, { timeout, expiresAt, paused: false, remainingOnPause: null, io, disabled: false });
+}
+
+function pauseDraftTimer(leagueId, io) {
+  const entry = draftTimers.get(leagueId);
+  if (!entry || entry.paused || entry.disabled) return;
+
+  clearTimeout(entry.timeout);
+  const remaining = Math.max(0, Math.round((entry.expiresAt - Date.now()) / 1000));
+  entry.timeout = null;
+  entry.paused = true;
+  entry.remainingOnPause = remaining;
+
+  if (io) {
+    io.to(`league:${leagueId}`).emit('draft:timer-paused', { seconds_remaining: remaining });
+  }
+}
+
+function resumeDraftTimer(leagueId, io) {
+  const entry = draftTimers.get(leagueId);
+  if (!entry || !entry.paused || entry.disabled) return;
+
+  const seconds = entry.remainingOnPause || 1;
+  const expiresAt = Date.now() + seconds * 1000;
+
+  entry.paused = false;
+  entry.remainingOnPause = null;
+  entry.expiresAt = expiresAt;
+
+  if (io) {
+    io.to(`league:${leagueId}`).emit('draft:timer', {
+      seconds_remaining: seconds,
+      expires_at: expiresAt,
+    });
+  }
+
+  entry.timeout = setTimeout(async () => {
+    draftTimers.delete(leagueId);
+    try {
+      await autoPickOnTimeout(leagueId, io);
+    } catch {
+      // Timer expired but auto-pick failed
+    }
+  }, seconds * 1000);
+}
+
+function getDraftTimerState(leagueId) {
+  const entry = draftTimers.get(leagueId);
+  if (!entry) return { paused: false, secondsRemaining: null, disabled: false };
+  if (entry.disabled) return { paused: false, secondsRemaining: null, disabled: true };
+  if (entry.paused) return { paused: true, secondsRemaining: entry.remainingOnPause, disabled: false };
+  const remaining = Math.max(0, Math.round((entry.expiresAt - Date.now()) / 1000));
+  return { paused: false, secondsRemaining: remaining, disabled: false };
+}
+
+/**
+ * Auto-pick a random player when the timer expires for the current drafter.
+ */
+async function autoPickOnTimeout(leagueId, io) {
+  const league = await leagueModel.findById(leagueId);
+  if (!league || league.draft_status !== 'in_progress') return;
+
+  const members = await leagueModel.findMembersByLeague(leagueId);
+  const picks = await draftPickModel.findByLeague(leagueId);
+  const snakeOrder = generateSnakeOrder(league.team_count, league.roster_size);
+  const currentPos = getCurrentPickPosition(picks.length, snakeOrder);
+  if (currentPos === null) return;
+
+  const onTheClock = members.find((m) => m.draft_position === currentPos);
+  if (!onTheClock) return;
+
+  // Pick a random available player
+  const draftedPlayerIds = picks.map((p) => p.player_id);
+  const availableResult = await pool.query(
+    `SELECT id FROM players WHERE id != ALL($1::uuid[]) ORDER BY RANDOM() LIMIT 1`,
+    [draftedPlayerIds]
+  );
+  if (availableResult.rows.length === 0) return;
+
+  const playerId = availableResult.rows[0].id;
+  const pick = await makePick(leagueId, onTheClock.user_id, playerId);
+
+  if (io) {
+    io.to(`league:${leagueId}`).emit('draft:pick', {
+      pick_number: pick.pick_number,
+      player_id: pick.player_id,
+      member_id: pick.member_id,
+      draft_position: pick.draft_position,
+      auto_picked: true,
+    });
+
+    if (pick.draft_status === 'completed') {
+      io.to(`league:${leagueId}`).emit('draft:complete', {});
+      clearDraftTimer(leagueId);
+    } else if (pick.next_turn) {
+      io.to(`league:${leagueId}`).emit('draft:turn', pick.next_turn);
+    }
+  }
+
+  // Continue auto-picking bots, then start timer for next human
+  if (pick.draft_status !== 'completed') {
+    await autoPick(leagueId, io);
+    // Start timer for next human turn
+    const updatedLeague = await leagueModel.findById(leagueId);
+    if (updatedLeague && updatedLeague.draft_status === 'in_progress') {
+      startDraftTimer(leagueId, updatedLeague.draft_timer_seconds ?? 90, io);
+    }
+  }
+}
+
 // ─── Pure functions ───────────────────────────────────────────────────────────
 
 /**
@@ -75,7 +227,7 @@ async function startDraft(leagueId, userId) {
     };
   }).sort((a, b) => a.draft_position - b.draft_position);
 
-  return { draft_status: 'in_progress', draft_order };
+  return { draft_status: 'in_progress', draft_order, draft_timer_seconds: league.draft_timer_seconds ?? 90 };
 }
 
 async function makePick(leagueId, userId, playerId) {
@@ -274,4 +426,9 @@ module.exports = {
   makePick,
   getDraftState,
   autoPick,
+  startDraftTimer,
+  clearDraftTimer,
+  pauseDraftTimer,
+  resumeDraftTimer,
+  getDraftTimerState,
 };

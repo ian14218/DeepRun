@@ -1,16 +1,27 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 import { getLeague } from '../services/leagueService';
-import { getDraftState, startDraft, makePick } from '../services/draftService';
+import { getDraftState, startDraft, makePick, controlDraftTimer } from '../services/draftService';
 import DraftBoard from '../components/DraftBoard';
 import PlayerList from '../components/PlayerList';
-import { Trophy, Play, Clock, Users, BarChart3 } from 'lucide-react';
+import DraftChat from '../components/DraftChat';
+import { Trophy, Play, Clock, Users, BarChart3, Pause, TimerOff, Timer } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -23,6 +34,13 @@ export default function DraftRoom() {
   const [draftState, setDraftState] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [pendingPick, setPendingPick] = useState(null);
+  const [secondsLeft, setSecondsLeft] = useState(null);
+  const [timerPaused, setTimerPaused] = useState(false);
+  const [timerDisabled, setTimerDisabled] = useState(false);
+  const [timerChangeSeconds, setTimerChangeSeconds] = useState('');
+  useDocumentTitle('Draft Room');
+  const timerRef = useRef(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -56,6 +74,36 @@ export default function DraftRoom() {
       setDraftState((prev) =>
         prev ? { ...prev, status: 'completed', current_turn: null } : prev
       );
+      setSecondsLeft(null);
+      if (timerRef.current) clearInterval(timerRef.current);
+    });
+    socket.on('draft:timer', ({ seconds_remaining, expires_at }) => {
+      // Timer running — clear paused/disabled state
+      setTimerPaused(false);
+      setTimerDisabled(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+
+      const updateCountdown = () => {
+        const remaining = Math.max(0, Math.round((expires_at - Date.now()) / 1000));
+        setSecondsLeft(remaining);
+        if (remaining <= 0 && timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+      };
+
+      updateCountdown();
+      timerRef.current = setInterval(updateCountdown, 1000);
+    });
+    socket.on('draft:timer-paused', ({ seconds_remaining }) => {
+      setTimerPaused(true);
+      setSecondsLeft(seconds_remaining);
+      if (timerRef.current) clearInterval(timerRef.current);
+    });
+    socket.on('draft:timer-disabled', () => {
+      setTimerDisabled(true);
+      setTimerPaused(false);
+      setSecondsLeft(null);
+      if (timerRef.current) clearInterval(timerRef.current);
     });
 
     return () => {
@@ -64,6 +112,10 @@ export default function DraftRoom() {
       socket.off('draft:pick');
       socket.off('draft:turn');
       socket.off('draft:complete');
+      socket.off('draft:timer');
+      socket.off('draft:timer-paused');
+      socket.off('draft:timer-disabled');
+      if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [socket, leagueId, loadData]);
 
@@ -75,10 +127,26 @@ export default function DraftRoom() {
     }
   }
 
-  async function handlePick(playerId) {
+  function handlePickRequest(playerId) {
+    setPendingPick(playerId);
+  }
+
+  async function handleConfirmPick() {
+    if (!pendingPick) return;
     try {
-      await makePick(leagueId, playerId);
+      await makePick(leagueId, pendingPick);
       toast.success('Pick made!');
+    } catch (e) {
+      toast.error(e.response?.data?.error || e.message);
+    } finally {
+      setPendingPick(null);
+    }
+  }
+
+  async function handleTimerControl(action, seconds) {
+    try {
+      await controlDraftTimer(leagueId, action, seconds);
+      setTimerChangeSeconds('');
     } catch (e) {
       toast.error(e.response?.data?.error || e.message);
     }
@@ -108,6 +176,11 @@ export default function DraftRoom() {
   const isMyTurn = draftState.current_turn?.user_id === user.id;
   const pickedPlayerIds = draftState.picks.map((p) => p.player_id);
   const totalPicks = league.team_count * league.roster_size;
+
+  // Find player name for pending pick confirmation
+  const pendingPickName = pendingPick
+    ? draftState.picks.find(() => false)?.player_name || 'this player'
+    : '';
 
   // Completed state
   if (draftState.status === 'completed') {
@@ -199,7 +272,7 @@ export default function DraftRoom() {
         </div>
       )}
 
-      {/* Turn indicator */}
+      {/* Turn indicator with timer */}
       <Card className={cn(
         'border transition-colors',
         isMyTurn ? 'border-accent bg-accent/10' : 'border-border'
@@ -210,17 +283,125 @@ export default function DraftRoom() {
             isMyTurn ? 'bg-accent animate-pulse' : 'bg-muted-foreground/30'
           )} />
           <p className={cn(
-            'text-sm font-medium',
+            'text-sm font-medium flex-1',
             isMyTurn ? 'text-accent' : 'text-muted-foreground'
           )}>
             {isMyTurn
               ? "It's your turn to pick!"
               : `Waiting for ${draftState.current_turn?.username} to pick...`}
           </p>
+          {timerDisabled ? (
+            <Badge variant="outline" className="tabular-nums">
+              <TimerOff className="h-3 w-3 mr-1" />
+              No Timer
+            </Badge>
+          ) : timerPaused ? (
+            <Badge variant="destructive" className="tabular-nums animate-pulse">
+              <Pause className="h-3 w-3 mr-1" />
+              PAUSED {secondsLeft !== null && `(${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')})`}
+            </Badge>
+          ) : secondsLeft !== null ? (
+            <Badge variant={secondsLeft <= 15 ? 'destructive' : 'secondary'} className="tabular-nums">
+              <Clock className="h-3 w-3 mr-1" />
+              {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
+            </Badge>
+          ) : null}
         </CardContent>
       </Card>
 
-      {/* Draft board + Player list */}
+      {/* Commissioner timer controls */}
+      {isCommissioner && (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-wrap items-center gap-2 p-3">
+            <span className="text-xs font-medium text-muted-foreground mr-1">Timer:</span>
+            {timerDisabled ? (
+              <>
+                <Input
+                  type="number"
+                  min="1"
+                  placeholder="90"
+                  value={timerChangeSeconds}
+                  onChange={(e) => setTimerChangeSeconds(e.target.value)}
+                  className="w-20 h-8 text-xs"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs"
+                  onClick={() => handleTimerControl('enable', parseInt(timerChangeSeconds, 10) || 90)}
+                >
+                  <Timer className="h-3 w-3 mr-1" />
+                  Enable Timer
+                </Button>
+              </>
+            ) : timerPaused ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs"
+                  onClick={() => handleTimerControl('resume')}
+                >
+                  <Play className="h-3 w-3 mr-1" />
+                  Resume
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-xs text-destructive"
+                  onClick={() => handleTimerControl('disable')}
+                >
+                  <TimerOff className="h-3 w-3 mr-1" />
+                  Disable Timer
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs"
+                  onClick={() => handleTimerControl('pause')}
+                >
+                  <Pause className="h-3 w-3 mr-1" />
+                  Pause
+                </Button>
+                <Input
+                  type="number"
+                  min="1"
+                  placeholder="seconds"
+                  value={timerChangeSeconds}
+                  onChange={(e) => setTimerChangeSeconds(e.target.value)}
+                  className="w-20 h-8 text-xs"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs"
+                  onClick={() => {
+                    const s = parseInt(timerChangeSeconds, 10);
+                    if (s > 0) handleTimerControl('change', s);
+                    else toast.error('Enter a valid number of seconds');
+                  }}
+                >
+                  Apply
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-xs text-destructive"
+                  onClick={() => handleTimerControl('disable')}
+                >
+                  <TimerOff className="h-3 w-3 mr-1" />
+                  Disable
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Draft board + Player list + Chat */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <DraftBoard
@@ -230,14 +411,35 @@ export default function DraftRoom() {
             currentUserId={user.id}
           />
         </div>
-        <div>
-          <PlayerList
-            canPick={isMyTurn}
-            onPick={handlePick}
-            pickedPlayerIds={pickedPlayerIds}
-          />
+        <div className="flex flex-col gap-4 lg:h-[calc(100vh-280px)] lg:min-h-[400px]">
+          <div className="flex-1 min-h-0">
+            <PlayerList
+              canPick={isMyTurn}
+              onPick={handlePickRequest}
+              pickedPlayerIds={pickedPlayerIds}
+            />
+          </div>
+          <div className="shrink-0">
+            <DraftChat leagueId={leagueId} />
+          </div>
         </div>
       </div>
+
+      {/* Pick confirmation dialog */}
+      <Dialog open={!!pendingPick} onOpenChange={(open) => !open && setPendingPick(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Pick</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to draft {pendingPickName || 'this player'}?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingPick(null)}>Cancel</Button>
+            <Button onClick={handleConfirmPick}>Confirm Pick</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
