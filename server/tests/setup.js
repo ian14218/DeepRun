@@ -2,19 +2,22 @@ const path = require('path');
 const fs = require('fs');
 const pool = require('../src/db');
 
-const MIGRATION_FILE = path.join(
-  __dirname,
-  '../../database/migrations/001_initial_schema.sql'
-);
+const MIGRATIONS_DIR = path.join(__dirname, '../../database/migrations');
 
 async function runMigrations() {
-  const sql = fs.readFileSync(MIGRATION_FILE, 'utf8');
-  await pool.query(sql);
+  const files = fs.readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
+  for (const file of files) {
+    const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
+    await pool.query(sql);
+  }
 }
 
 async function truncateTables() {
   await pool.query(`
     TRUNCATE TABLE
+      draft_messages,
       player_game_stats,
       draft_picks,
       players,

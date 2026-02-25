@@ -1,1 +1,1 @@
-ALTER TABLE leagues ADD COLUMN draft_timer_seconds INTEGER DEFAULT 90;
+ALTER TABLE leagues ADD COLUMN IF NOT EXISTS draft_timer_seconds INTEGER DEFAULT 90;

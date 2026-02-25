@@ -6,4 +6,4 @@ CREATE TABLE IF NOT EXISTS draft_messages (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_draft_messages_league ON draft_messages(league_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_draft_messages_league ON draft_messages(league_id, created_at);
