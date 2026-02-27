@@ -23,7 +23,6 @@ async function getContestById(id) {
 async function getActiveContest() {
   const result = await pool.query(
     `SELECT * FROM best_ball_contests
-     WHERE status NOT IN ('completed')
      ORDER BY created_at DESC
      LIMIT 1`
   );

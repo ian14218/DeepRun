@@ -6,9 +6,9 @@ vi.mock('../services/draftService');
 import * as draftService from '../services/draftService';
 
 const mockPlayers = [
-  { id: 'p1', name: 'John Smith', team_name: 'Duke', position: 'G', is_eliminated: false },
-  { id: 'p2', name: 'Bob Jones', team_name: 'UNC', position: 'F', is_eliminated: false },
-  { id: 'p3', name: 'Alice Brown', team_name: 'Duke', position: 'C', is_eliminated: false },
+  { id: 'p1', name: 'John Smith', team_name: 'Duke', position: 'G', is_eliminated: false, season_ppg: 15 },
+  { id: 'p2', name: 'Bob Jones', team_name: 'UNC', position: 'F', is_eliminated: false, season_ppg: 12 },
+  { id: 'p3', name: 'Alice Brown', team_name: 'Duke', position: 'C', is_eliminated: false, season_ppg: 10 },
 ];
 
 beforeEach(() => {

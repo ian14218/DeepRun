@@ -14,7 +14,7 @@ export default function Standings() {
 
   useEffect(() => {
     getStandings(id)
-      .then(setStandings)
+      .then((data) => setStandings(data.standings || data))
       .catch(() => setError('Failed to load standings.'))
       .finally(() => setLoading(false));
   }, [id]);

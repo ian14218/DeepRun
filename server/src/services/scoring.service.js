@@ -34,27 +34,36 @@ async function getEliminatedPlayerCount(memberId) {
 }
 
 async function getStandings(leagueId) {
-  const result = await pool.query(
-    `SELECT
-       lm.id AS member_id,
-       lm.user_id,
-       COALESCE(lm.team_name, u.username) AS team_name,
-       u.username,
-       COALESCE(SUM(pgs.points), 0)::int AS total_score,
-       COUNT(DISTINCT CASE WHEN p.is_eliminated = false THEN dp.player_id END)::int AS active_players,
-       COUNT(DISTINCT CASE WHEN p.is_eliminated = true  THEN dp.player_id END)::int AS eliminated_players,
-       COUNT(DISTINCT CASE WHEN p.is_eliminated = false THEN dp.player_id END)::int AS players_remaining
-     FROM league_members lm
-     JOIN users u ON u.id = lm.user_id
-     LEFT JOIN draft_picks dp ON dp.member_id = lm.id
-     LEFT JOIN players p ON p.id = dp.player_id
-     LEFT JOIN player_game_stats pgs ON pgs.player_id = dp.player_id
-     WHERE lm.league_id = $1
-     GROUP BY lm.id, lm.user_id, lm.team_name, u.username
-     ORDER BY total_score DESC`,
-    [leagueId]
-  );
-  return result.rows;
+  const [result, champResult] = await Promise.all([
+    pool.query(
+      `SELECT
+         lm.id AS member_id,
+         lm.user_id,
+         COALESCE(lm.team_name, u.username) AS team_name,
+         u.username,
+         COALESCE(SUM(pgs.points), 0)::int AS total_score,
+         COUNT(DISTINCT CASE WHEN p.is_eliminated = false THEN dp.player_id END)::int AS active_players,
+         COUNT(DISTINCT CASE WHEN p.is_eliminated = true  THEN dp.player_id END)::int AS eliminated_players,
+         COUNT(DISTINCT CASE WHEN p.is_eliminated = false THEN dp.player_id END)::int AS players_remaining
+       FROM league_members lm
+       JOIN users u ON u.id = lm.user_id
+       LEFT JOIN draft_picks dp ON dp.member_id = lm.id
+       LEFT JOIN players p ON p.id = dp.player_id
+       LEFT JOIN player_game_stats pgs ON pgs.player_id = dp.player_id
+       WHERE lm.league_id = $1
+       GROUP BY lm.id, lm.user_id, lm.team_name, u.username
+       ORDER BY total_score DESC`,
+      [leagueId]
+    ),
+    pool.query(
+      `SELECT EXISTS(
+         SELECT 1 FROM player_game_stats WHERE tournament_round = 'Championship'
+       ) AS completed`
+    ),
+  ]);
+  const rows = result.rows;
+  rows.tournament_completed = champResult.rows[0]?.completed || false;
+  return rows;
 }
 
 async function getTeamRoster(leagueId, memberId) {

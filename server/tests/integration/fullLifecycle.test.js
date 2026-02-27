@@ -147,7 +147,7 @@ describe('Full lifecycle integration', () => {
       .set('Authorization', `Bearer ${users[0].token}`);
     expect(standingsRes.status).toBe(200);
 
-    const standings = standingsRes.body;
+    const standings = standingsRes.body.standings;
     expect(standings).toHaveLength(4);
 
     // Each team drafted 1 Duke (20 pts) and 1 UNC (10 pts) → total 30 pts each

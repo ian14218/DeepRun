@@ -4,8 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 import { getLeague, fillWithBots, updateLeague, leaveLeague, removeMember } from '../services/leagueService';
 import { getStandings, getTeamRoster } from '../services/standingsService';
+import StandingsTable from '../components/StandingsTable';
 import PlayerRow from '../components/PlayerRow';
-import { BarChart3, Users, Swords, Tv, Trophy, Copy, Bot, Play, LogOut, UserMinus, Pencil } from 'lucide-react';
+import TeamLogo from '../components/TeamLogo';
+import { BarChart3, Users, Swords, Tv, Trophy, Copy, Bot, Play, LogOut, UserMinus, Pencil, Crown, Target, Heart, TrendingUp } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,11 +28,13 @@ import {
 import {
   Table,
   TableBody,
+  TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 const ROUNDS = [
   'Round of 64',
@@ -61,6 +65,7 @@ export default function LeagueDetail() {
   const navigate = useNavigate();
   const [league, setLeague] = useState(null);
   const [standings, setStandings] = useState([]);
+  const [tournamentCompleted, setTournamentCompleted] = useState(false);
   const [myRoster, setMyRoster] = useState([]);
   const [myMemberId, setMyMemberId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -151,12 +156,14 @@ export default function LeagueDetail() {
   useEffect(() => {
     async function load() {
       try {
-        const [leagueData, standingsData] = await Promise.all([
+        const [leagueData, standingsResp] = await Promise.all([
           getLeague(id),
-          getStandings(id).catch(() => []),
+          getStandings(id).catch(() => ({ standings: [], tournament_completed: false })),
         ]);
         setLeague(leagueData);
-        setStandings(standingsData);
+        const standingsData = standingsResp.standings || standingsResp;
+        setStandings(Array.isArray(standingsData) ? standingsData : []);
+        setTournamentCompleted(standingsResp.tournament_completed || false);
 
         if (leagueData.draft_status === 'completed') {
           const myMember = leagueData.members?.find((m) => m.user_id === user?.id);
@@ -186,12 +193,15 @@ export default function LeagueDetail() {
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-6 w-20" />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {[1, 2, 3, 4, 5].map((i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-24 rounded-lg" />
           ))}
         </div>
-        <Skeleton className="h-40 rounded-lg" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-64 rounded-lg" />
+          <Skeleton className="h-64 rounded-lg" />
+        </div>
       </div>
     );
   }
@@ -200,10 +210,18 @@ export default function LeagueDetail() {
   if (!league) return null;
 
   const isCommissioner = user?.id === league.commissioner_id;
+  const draftDone = league.draft_status === 'completed';
   const myRow = standings.find((s) => s.user_id === user?.id);
+  const myRank = myRow ? standings.indexOf(myRow) + 1 : null;
   const playersAlive = myRow?.active_players ?? null;
   const playersTotal = myRow ? myRow.active_players + myRow.eliminated_players : null;
+  const leader = standings.length > 0 ? standings[0] : null;
   const status = STATUS_CONFIG[league.draft_status] || { label: league.draft_status, variant: 'secondary' };
+
+  // Find the best single-round performer on user's roster
+  const topPerformer = myRoster.length > 0
+    ? myRoster.reduce((best, p) => (p.total_points > (best?.total_points ?? -1) ? p : best), null)
+    : null;
 
   return (
     <div className="space-y-6">
@@ -222,11 +240,6 @@ export default function LeagueDetail() {
           <p className="text-sm text-muted-foreground">
             {league.members?.length ?? 0} / {league.team_count} members · Roster size: {league.roster_size}
           </p>
-          {playersAlive !== null && (
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {playersAlive} of {playersTotal} players still alive
-            </p>
-          )}
         </div>
       </div>
 
@@ -272,6 +285,237 @@ export default function LeagueDetail() {
         </Button>
       )}
 
+      {/* ===== POST-DRAFT DASHBOARD ===== */}
+      {draftDone && myRow && (
+        <>
+          {/* Champion / Leader Banner */}
+          {leader && leader.total_score > 0 && (
+            <Card className={cn(
+              'overflow-hidden border-2',
+              tournamentCompleted
+                ? 'border-yellow-500/50 bg-gradient-to-r from-yellow-500/10 via-amber-500/5 to-yellow-500/10'
+                : 'border-primary/30 bg-gradient-to-r from-primary/5 to-transparent'
+            )}>
+              <CardContent className="p-5">
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    'rounded-full p-3',
+                    tournamentCompleted ? 'bg-yellow-500/20' : 'bg-primary/10'
+                  )}>
+                    <Trophy className={cn(
+                      'h-7 w-7',
+                      tournamentCompleted ? 'text-yellow-500' : 'text-primary'
+                    )} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={cn(
+                      'text-xs font-semibold uppercase tracking-wide mb-0.5',
+                      tournamentCompleted ? 'text-yellow-500' : 'text-primary'
+                    )}>
+                      {tournamentCompleted ? 'League Champion' : 'League Leader'}
+                    </p>
+                    <p className="text-xl font-bold truncate">
+                      {leader.team_name || leader.username}
+                      {leader.user_id === user?.id && (
+                        <span className="text-sm font-normal text-muted-foreground ml-2">(You!)</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-2xl font-bold">{leader.total_score}</p>
+                    <p className="text-xs text-muted-foreground">points</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Stat Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* Your Rank */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="rounded-md bg-primary/10 p-1.5">
+                    <Crown className="h-4 w-4 text-primary" />
+                  </div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Rank</p>
+                </div>
+                <p className="text-2xl font-bold">
+                  #{myRank}
+                  <span className="text-sm font-normal text-muted-foreground ml-1">
+                    of {standings.length}
+                  </span>
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Your Points */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="rounded-md bg-primary/10 p-1.5">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                  </div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Points</p>
+                </div>
+                <p className="text-2xl font-bold">{myRow.total_score}</p>
+                {leader && leader.user_id !== user?.id && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {myRow.total_score - leader.total_score} from 1st
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Players Alive */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="rounded-md bg-success/10 p-1.5">
+                    <Heart className="h-4 w-4 text-success" />
+                  </div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Players Alive</p>
+                </div>
+                <p className="text-2xl font-bold">
+                  {playersAlive}
+                  <span className="text-sm font-normal text-muted-foreground ml-1">
+                    of {playersTotal}
+                  </span>
+                </p>
+                {playersTotal > 0 && (
+                  <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-success transition-all"
+                      style={{ width: `${(playersAlive / playersTotal) * 100}%` }}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Top Scorer */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="rounded-md bg-yellow-500/10 p-1.5">
+                    <Target className="h-4 w-4 text-yellow-500" />
+                  </div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Top Scorer</p>
+                </div>
+                {topPerformer ? (
+                  <>
+                    <p className="text-lg font-bold truncate">{topPerformer.name}</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <TeamLogo externalId={topPerformer.team_external_id} teamName={topPerformer.team_name} size={14} />
+                      {topPerformer.total_points} pts
+                      {topPerformer.is_eliminated && (
+                        <Badge variant="destructive" className="text-[9px] ml-1 py-0">OUT</Badge>
+                      )}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No players yet</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Two-column: Standings + My Roster */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* League Standings */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold">League Standings</h2>
+                <Link
+                  to={`/leagues/${id}/standings`}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Full Standings
+                </Link>
+              </div>
+              <StandingsTable standings={standings} leagueId={id} />
+            </div>
+
+            {/* My Roster */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold">My Roster</h2>
+                {myMemberId && (
+                  <Link
+                    to={`/leagues/${id}/team/${myMemberId}`}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Full Roster
+                  </Link>
+                )}
+              </div>
+              {myRoster.length === 0 ? (
+                <Card>
+                  <CardContent className="py-6 text-center text-muted-foreground text-sm">
+                    No players on your roster yet.
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-border">
+                          <TableHead>Player</TableHead>
+                          <TableHead className="hidden sm:table-cell">Team</TableHead>
+                          <TableHead className="text-right">Pts</TableHead>
+                          <TableHead className="text-right hidden sm:table-cell">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {myRoster.map((player) => (
+                          <TableRow
+                            key={player.player_id}
+                            className={cn(
+                              'border-border',
+                              player.is_eliminated && 'bg-destructive/5'
+                            )}
+                          >
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <TeamLogo externalId={player.team_external_id} teamName={player.team_name} size={20} />
+                                <div>
+                                  <p className={cn(
+                                    'font-medium text-sm',
+                                    player.is_eliminated && 'line-through text-muted-foreground'
+                                  )}>
+                                    {player.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground sm:hidden">
+                                    {player.team_name}
+                                  </p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm hidden sm:table-cell">
+                              {player.team_name}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">{player.total_points}</TableCell>
+                            <TableCell className="text-right hidden sm:table-cell">
+                              {player.is_eliminated ? (
+                                <Badge variant="destructive" className="text-[10px]">Eliminated</Badge>
+                              ) : (
+                                <Badge variant="success" className="text-[10px]">Active</Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Navigation cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {NAV_CARDS.map(({ label, description, path, icon: Icon }) => (
@@ -289,8 +533,8 @@ export default function LeagueDetail() {
         ))}
       </div>
 
-      {/* My Roster (only after draft completed) */}
-      {league.draft_status === 'completed' && myMemberId && (
+      {/* My Roster (pre-dashboard fallback for when draft is done but no standings row for user) */}
+      {draftDone && !myRow && myMemberId && myRoster.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">My Roster</h2>
@@ -298,44 +542,36 @@ export default function LeagueDetail() {
               to={`/leagues/${id}/team/${myMemberId}`}
               className="text-sm text-primary hover:underline"
             >
-              View Full Roster →
+              View Full Roster
             </Link>
           </div>
-          {myRoster.length === 0 ? (
-            <Card>
-              <CardContent className="py-6 text-center text-muted-foreground text-sm">
-                No players on your roster yet.
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="p-0">
-                <ScrollArea className="w-full">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-border">
-                        <TableHead>Player</TableHead>
-                        <TableHead>College Team</TableHead>
-                        <TableHead>Pos</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        {ROUNDS.map((r) => (
-                          <TableHead key={r} className="text-right text-xs">
-                            {r}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {myRoster.map((player) => (
-                        <PlayerRow key={player.player_id} player={player} />
+          <Card>
+            <CardContent className="p-0">
+              <ScrollArea className="w-full">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border">
+                      <TableHead>Player</TableHead>
+                      <TableHead>College Team</TableHead>
+                      <TableHead>Pos</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      {ROUNDS.map((r) => (
+                        <TableHead key={r} className="text-right text-xs">
+                          {r}
+                        </TableHead>
                       ))}
-                    </TableBody>
-                  </Table>
-                  <ScrollBar orientation="horizontal" />
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {myRoster.map((player) => (
+                      <PlayerRow key={player.player_id} player={player} />
+                    ))}
+                  </TableBody>
+                </Table>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -348,7 +584,7 @@ export default function LeagueDetail() {
           <CardContent className="p-0">
             <ul className="divide-y divide-border">
               {league.members?.map((m) => {
-                const draftDone = league.draft_status === 'completed';
+                const memberStanding = standings.find((s) => s.member_id === m.id);
                 const inner = (
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-3">
@@ -357,7 +593,14 @@ export default function LeagueDetail() {
                           {m.username?.slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="font-medium text-sm">{m.username}</span>
+                      <div>
+                        <span className="font-medium text-sm">{m.username}</span>
+                        {draftDone && memberStanding && (
+                          <p className="text-xs text-muted-foreground">
+                            {memberStanding.total_score} pts · {memberStanding.active_players} active
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {m.is_bot && (

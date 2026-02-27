@@ -111,9 +111,14 @@ describe('LeagueDetail page', () => {
 
   it('shows how many players the current user has still alive', async () => {
     // commissioner has active_players=3, eliminated_players=2 → 3 of 5 alive
+    // dashboard stat cards only appear when draft is completed
+    const completedLeague = { ...mockLeague, draft_status: 'completed' };
+    leagueService.getLeague.mockResolvedValue(completedLeague);
+    standingsService.getTeamRoster.mockResolvedValue([]);
     renderLeagueDetail(COMMISSIONER_ID);
     await waitFor(() => {
-      expect(screen.getByText(/3 of 5/i)).toBeInTheDocument();
+      expect(screen.getByText(/players alive/i)).toBeInTheDocument();
+      expect(screen.getByText(/of 5/)).toBeInTheDocument();
     });
   });
 });

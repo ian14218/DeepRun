@@ -12,7 +12,10 @@ router.use(authenticateToken);
 router.get('/standings', async (req, res) => {
   try {
     const standings = await scoringService.getStandings(req.params.id);
-    return res.status(200).json(standings);
+    return res.status(200).json({
+      standings,
+      tournament_completed: standings.tournament_completed || false,
+    });
   } catch (err) {
     return res.status(err.status || 500).json({ error: err.message });
   }

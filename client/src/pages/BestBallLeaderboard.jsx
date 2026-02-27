@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Trophy } from 'lucide-react';
 
 export default function BestBallLeaderboard() {
   const { user } = useAuth();
@@ -94,20 +94,36 @@ export default function BestBallLeaderboard() {
                 {entries.map((entry, idx) => {
                   const rank = (page - 1) * limit + idx + 1;
                   const isCurrentUser = entry.user_id === user?.id;
+                  const isChampion = rank === 1 && contest?.status === 'completed';
 
                   return (
                     <TableRow
                       key={entry.id}
-                      className={isCurrentUser ? 'bg-primary/5' : 'cursor-pointer hover:bg-muted/50'}
+                      className={
+                        isChampion
+                          ? 'bg-yellow-500/10 border-yellow-500/30 cursor-pointer hover:bg-yellow-500/15'
+                          : isCurrentUser
+                            ? 'bg-primary/5 cursor-pointer hover:bg-primary/10'
+                            : 'cursor-pointer hover:bg-muted/50'
+                      }
                       onClick={() => navigate(`/best-ball/users/${entry.user_id}`)}
                     >
                       <TableCell className="text-center font-mono font-bold">
-                        {rank}
+                        {isChampion ? (
+                          <Trophy className="h-5 w-5 text-yellow-500 inline-block" />
+                        ) : rank}
                       </TableCell>
                       <TableCell>
-                        <span className={isCurrentUser ? 'font-bold text-primary' : ''}>
+                        <span className={
+                          isChampion
+                            ? 'font-bold text-yellow-500'
+                            : isCurrentUser
+                              ? 'font-bold text-primary'
+                              : ''
+                        }>
                           {entry.username}
                           {isCurrentUser && ' (You)'}
+                          {isChampion && !isCurrentUser && ' — Champion'}
                         </span>
                       </TableCell>
                       <TableCell className="text-center font-mono font-semibold">

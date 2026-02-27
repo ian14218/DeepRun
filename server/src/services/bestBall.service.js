@@ -14,6 +14,7 @@ function createError(message, status) {
  */
 async function ensureActiveContest() {
   const existing = await bestBallModel.getActiveContest();
+  // Return the most recent contest even if completed (so users can see results)
   if (existing) return existing;
 
   // Check if tournament teams + players exist

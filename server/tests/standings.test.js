@@ -77,12 +77,13 @@ describe('GET /api/leagues/:id/standings', () => {
       .set('Authorization', `Bearer ${user1.token}`);
 
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body).toHaveLength(2);
+    const { standings } = res.body;
+    expect(Array.isArray(standings)).toBe(true);
+    expect(standings).toHaveLength(2);
 
     // Member1 scored 45, Member2 scored 5 → Member1 first
-    expect(res.body[0].total_score).toBe(45);
-    expect(res.body[1].total_score).toBe(5);
+    expect(standings[0].total_score).toBe(45);
+    expect(standings[1].total_score).toBe(5);
   });
 
   it('includes active_players and eliminated_players counts per team', async () => {
@@ -93,7 +94,7 @@ describe('GET /api/leagues/:id/standings', () => {
       .set('Authorization', `Bearer ${user1.token}`);
 
     expect(res.status).toBe(200);
-    const m1Row = res.body.find((r) => r.member_id === member1.id);
+    const m1Row = res.body.standings.find((r) => r.member_id === member1.id);
     expect(m1Row).toHaveProperty('active_players', 1);    // p1 is active
     expect(m1Row).toHaveProperty('eliminated_players', 1); // p3 is eliminated
   });
@@ -105,8 +106,8 @@ describe('GET /api/leagues/:id/standings', () => {
       .get(`/api/leagues/${league.id}/standings`)
       .set('Authorization', `Bearer ${user1.token}`);
 
-    const m1Row = res.body.find((r) => r.member_id === member1.id);
-    const m2Row = res.body.find((r) => r.member_id === member2.id);
+    const m1Row = res.body.standings.find((r) => r.member_id === member1.id);
+    const m2Row = res.body.standings.find((r) => r.member_id === member2.id);
 
     expect(m1Row.players_remaining).toBe(1); // only p1 is active
     expect(m2Row.players_remaining).toBe(1); // p2 is active

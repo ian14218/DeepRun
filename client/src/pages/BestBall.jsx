@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { getActiveContest, getMyLineup, getEntryDetail, enterContest } from '@/services/bestBallService';
+import { getActiveContest, getMyLineup, getEntryDetail, enterContest, getLeaderboard } from '@/services/bestBallService';
 import { getTournamentTeams } from '@/services/standingsService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,7 @@ export default function BestBall() {
   const [entryDetail, setEntryDetail] = useState(null);
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [winner, setWinner] = useState(null);
   const [entering, setEntering] = useState(false);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('roster');
@@ -63,12 +64,24 @@ export default function BestBall() {
           setEntry(lineup);
           // If tournament is underway and user has an entry, load detailed stats + bracket data
           if (lineup && ['locked', 'live', 'completed'].includes(c.status)) {
-            const [detail, teamsData] = await Promise.all([
+            const fetches = [
               getEntryDetail(lineup.id),
               getTournamentTeams(),
-            ]);
+            ];
+            // Fetch the #1 entry when contest is completed
+            if (c.status === 'completed') {
+              fetches.push(getLeaderboard(c.id, { page: 1, limit: 1 }));
+            }
+            const [detail, teamsData, leaderboard] = await Promise.all(fetches);
             setEntryDetail(detail);
             setTeams(teamsData);
+            if (leaderboard?.rows?.[0]) {
+              setWinner(leaderboard.rows[0]);
+            }
+          } else if (c.status === 'completed') {
+            // User has no entry but contest is done — still show the winner
+            const lb = await getLeaderboard(c.id, { page: 1, limit: 1 });
+            if (lb?.rows?.[0]) setWinner(lb.rows[0]);
           }
         }
       } catch {
@@ -138,6 +151,34 @@ export default function BestBall() {
             </div>
           </div>
         </div>
+
+        {/* Champion Banner (completed contest) */}
+        {contest.status === 'completed' && winner && (
+          <Card className="overflow-hidden border-2 border-yellow-500/50 bg-gradient-to-r from-yellow-500/10 via-amber-500/5 to-yellow-500/10">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-4">
+                <div className="rounded-full p-3 bg-yellow-500/20">
+                  <Trophy className="h-7 w-7 text-yellow-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide mb-0.5 text-yellow-500">
+                    Contest Champion
+                  </p>
+                  <p className="text-xl font-bold truncate">
+                    {winner.username}
+                    {winner.user_id === user?.id && (
+                      <span className="text-sm font-normal text-muted-foreground ml-2">(You!)</span>
+                    )}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-2xl font-bold">{winner.total_score}</p>
+                  <p className="text-xs text-muted-foreground">points</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Score + Rank summary */}
         <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
@@ -290,6 +331,29 @@ export default function BestBall() {
           )}
         </div>
       </div>
+
+      {/* Champion Banner (completed contest, no entry) */}
+      {contest.status === 'completed' && winner && (
+        <Card className="overflow-hidden border-2 border-yellow-500/50 bg-gradient-to-r from-yellow-500/10 via-amber-500/5 to-yellow-500/10">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-4">
+              <div className="rounded-full p-3 bg-yellow-500/20">
+                <Trophy className="h-7 w-7 text-yellow-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide mb-0.5 text-yellow-500">
+                  Contest Champion
+                </p>
+                <p className="text-xl font-bold truncate">{winner.username}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-2xl font-bold">{winner.total_score}</p>
+                <p className="text-xs text-muted-foreground">points</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {error && (
         <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-lg">
