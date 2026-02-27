@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getLeagues } from '../services/leagueService';
-import { Menu, LogOut, ChevronDown, Shield } from 'lucide-react';
+import { Menu, LogOut, ChevronDown, Shield, Trophy } from 'lucide-react';
 import DeepRunLogo from './DeepRunLogo';
 import { Button } from '@/components/ui/button';
 import {
@@ -66,6 +66,12 @@ export default function Navbar() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+
+          {/* Best Ball link */}
+          <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={() => navigate('/best-ball')}>
+            <Trophy className="h-3.5 w-3.5" />
+            Best Ball
+          </Button>
 
           {/* Admin link */}
           {user.is_admin && (
@@ -142,6 +148,16 @@ export default function Navbar() {
               ))}
             </>
           )}
+          <button
+            onClick={() => {
+              navigate('/best-ball');
+              setMobileOpen(false);
+            }}
+            className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-secondary transition-colors"
+          >
+            <Trophy className="h-4 w-4" />
+            Best Ball
+          </button>
           {user.is_admin && (
             <button
               onClick={() => {

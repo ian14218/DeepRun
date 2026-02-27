@@ -26,7 +26,7 @@ beforeAll(async () => {
   serverAddress = `http://localhost:${httpServer.address().port}`;
 });
 
-afterEach(async () => {
+beforeEach(async () => {
   await truncateTables();
 });
 

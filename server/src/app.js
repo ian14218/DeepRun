@@ -12,6 +12,7 @@ const draftRoutes = require('./routes/draft.routes');
 const playerRoutes = require('./routes/player.routes');
 const standingsRoutes = require('./routes/standings.routes');
 const adminRoutes = require('./routes/admin.routes');
+const bestBallRoutes = require('./routes/bestBall.routes');
 const { authenticateToken } = require('./middleware/auth.middleware');
 const errorHandler = require('./middleware/errorHandler');
 const pool = require('./db');
@@ -60,6 +61,9 @@ app.use('/api/leagues/:id', standingsRoutes);
 
 // Admin routes (auth + admin middleware applied inside the router)
 app.use('/api/admin', adminRoutes);
+
+// Best Ball routes (auth middleware applied inside the router)
+app.use('/api/best-ball', bestBallRoutes);
 
 // Protected test route (used by auth middleware tests)
 app.get('/api/protected-test', authenticateToken, (req, res) => {

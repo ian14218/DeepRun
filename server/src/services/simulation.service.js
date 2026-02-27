@@ -3,6 +3,8 @@ const playerModel = require('../models/player.model');
 const playerGameStats = require('../models/playerGameStats.model');
 const eliminationService = require('./elimination.service');
 const tournamentTeamModel = require('../models/tournamentTeam.model');
+const bestBallService = require('./bestBall.service');
+const bestBallModel = require('../models/bestBall.model');
 
 // Standard bracket matchups for Round of 64 (seed pairings per region)
 const R64_SEED_MATCHUPS = [
@@ -211,6 +213,21 @@ async function simulateRound() {
       awayScore: scoreB,
       winner: aWins ? teamA.name : teamB.name,
     });
+  }
+
+  // Update Best Ball: auto-transition open→live and update scores
+  try {
+    const contest = await bestBallModel.getActiveContest();
+    if (contest) {
+      if (contest.status === 'open') {
+        await bestBallModel.updateContestStatus(contest.id, 'live');
+      }
+      if (['open', 'locked', 'live'].includes(contest.status)) {
+        await bestBallService.updateScores(contest.id);
+      }
+    }
+  } catch (_) {
+    // Best Ball score update is non-critical; don't fail the simulation
   }
 
   return { round: roundName, games };

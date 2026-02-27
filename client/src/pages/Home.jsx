@@ -3,7 +3,7 @@ import useDocumentTitle from '../hooks/useDocumentTitle';
 import DeepRunLogo from '../components/DeepRunLogo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Users, Trophy, BarChart3 } from 'lucide-react';
+import { Users, Trophy, BarChart3, DollarSign, ChevronRight } from 'lucide-react';
 
 const STEPS = [
   {
@@ -48,7 +48,7 @@ export default function Home() {
       </div>
 
       {/* How it works */}
-      <div className="max-w-4xl mx-auto px-4 pb-24">
+      <div className="max-w-4xl mx-auto px-4 pb-16">
         <h2 className="text-2xl font-bold text-center mb-8">How It Works</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {STEPS.map(({ icon: Icon, title, description }, i) => (
@@ -65,6 +65,32 @@ export default function Home() {
             </Card>
           ))}
         </div>
+      </div>
+
+      {/* Best Ball CTA */}
+      <div className="max-w-4xl mx-auto px-4 pb-24">
+        <Card className="overflow-hidden border-emerald-500/20 bg-gradient-to-r from-emerald-500/5 to-accent/5">
+          <CardContent className="p-8 sm:p-10 flex flex-col sm:flex-row items-center gap-6">
+            <div className="h-16 w-16 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
+              <DollarSign className="h-8 w-8 text-emerald-400" />
+            </div>
+            <div className="flex-1 text-center sm:text-left">
+              <h2 className="text-2xl font-bold mb-2">Best Ball</h2>
+              <p className="text-muted-foreground mb-1">
+                No league needed. Build an 8-player lineup with a $8,000 salary cap and compete against the entire platform.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Every player has a price based on PPG, minutes, and seed. Find the value picks and outscore the field.
+              </p>
+            </div>
+            <Button asChild size="lg" className="shrink-0">
+              <Link to="/register">
+                Play Now
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -5,7 +5,9 @@ import Dashboard from './Dashboard';
 import { AuthContext } from '../context/AuthContext';
 
 vi.mock('../services/leagueService');
+vi.mock('../services/bestBallService');
 import * as leagueService from '../services/leagueService';
+import * as bestBallService from '../services/bestBallService';
 
 const mockUser = { id: 'user-1', username: 'testuser', email: 'test@example.com' };
 
@@ -19,7 +21,11 @@ function renderDashboard(user = mockUser) {
   );
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  bestBallService.getActiveContest.mockResolvedValue(null);
+  bestBallService.getMyLineup.mockResolvedValue(null);
+});
 
 describe('Dashboard', () => {
   it('shows Create League and Join League buttons', async () => {

@@ -17,6 +17,11 @@ async function runMigrations() {
 async function truncateTables() {
   await pool.query(`
     TRUNCATE TABLE
+      best_ball_roster_players,
+      best_ball_entries,
+      best_ball_player_prices,
+      best_ball_contests,
+      best_ball_config,
       draft_messages,
       player_game_stats,
       draft_picks,

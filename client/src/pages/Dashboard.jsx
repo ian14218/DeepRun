@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 import { getLeagues } from '../services/leagueService';
-import { Plus, UserPlus, Trophy, Users } from 'lucide-react';
+import { getActiveContest, getMyLineup } from '../services/bestBallService';
+import { Plus, UserPlus, Trophy, Users, DollarSign, ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,11 +19,20 @@ export default function Dashboard() {
   useDocumentTitle('Dashboard');
   const [leagues, setLeagues] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [bbContest, setBbContest] = useState(null);
+  const [bbEntry, setBbEntry] = useState(null);
 
   useEffect(() => {
     getLeagues()
       .then(setLeagues)
       .finally(() => setLoading(false));
+    getActiveContest()
+      .then((c) => {
+        setBbContest(c);
+        if (c) return getMyLineup(c.id);
+      })
+      .then((entry) => { if (entry) setBbEntry(entry); })
+      .catch(() => {});
   }, []);
 
   return (
@@ -44,6 +54,53 @@ export default function Dashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Best Ball section */}
+      <Link to="/best-ball">
+        <Card className="mb-8 hover:border-emerald-500/40 transition-colors border-emerald-500/20 bg-gradient-to-r from-emerald-500/5 to-transparent">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
+              <DollarSign className="h-5 w-5 text-emerald-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <h2 className="text-base font-semibold">Best Ball</h2>
+                {bbContest && (
+                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-xs">
+                    {bbContest.status}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground truncate">
+                {bbEntry
+                  ? `${bbEntry.roster?.length || 0}/${bbContest.roster_size} players · $${bbEntry.budget_remaining?.toLocaleString()} remaining`
+                  : bbContest
+                    ? `$${bbContest.budget.toLocaleString()} budget · ${bbContest.roster_size} players · Compete against everyone`
+                    : 'Build an 8-player lineup with a $8,000 salary cap and compete against everyone'
+                }
+              </p>
+            </div>
+            <div className="shrink-0">
+              {bbEntry ? (
+                <Button size="sm" variant="outline">
+                  {bbContest.status === 'open' ? 'Edit Lineup' : 'View'}
+                  <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              ) : bbContest?.status === 'open' ? (
+                <Button size="sm">
+                  Enter
+                  <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline">
+                  View
+                  <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
 
       {/* Loading skeletons */}
       {loading && (

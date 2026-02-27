@@ -8,7 +8,7 @@ beforeAll(async () => {
   await runMigrations();
 });
 
-afterEach(async () => {
+beforeEach(async () => {
   await truncateTables();
 });
 

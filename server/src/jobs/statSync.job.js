@@ -3,6 +3,8 @@ const playerGameStats = require('../models/playerGameStats.model');
 const playerModel = require('../models/player.model');
 const teamModel = require('../models/tournamentTeam.model');
 const eliminationService = require('../services/elimination.service');
+const bestBallService = require('../services/bestBall.service');
+const bestBallModel = require('../models/bestBall.model');
 
 /**
  * Main sync job.
@@ -95,6 +97,16 @@ async function processGame(game) {
         await teamModel.updateWinsFromStats(winnerTeam.id);
       }
     }
+  }
+
+  // Update Best Ball scores after processing all games
+  try {
+    const activeContest = await bestBallModel.getActiveContest();
+    if (activeContest && ['live', 'locked'].includes(activeContest.status)) {
+      await bestBallService.updateScores(activeContest.id);
+    }
+  } catch (err) {
+    console.error('[statSync] Failed to update Best Ball scores:', err.message);
   }
 }
 

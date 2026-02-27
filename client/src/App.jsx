@@ -24,6 +24,11 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminLeagues from './pages/admin/AdminLeagues';
 import AdminLeagueDetail from './pages/admin/AdminLeagueDetail';
 import AdminTournament from './pages/admin/AdminTournament';
+import BestBall from './pages/BestBall';
+import BestBallRoster from './pages/BestBallRoster';
+import BestBallLeaderboard from './pages/BestBallLeaderboard';
+import BestBallEntry from './pages/BestBallEntry';
+import BestBallAdmin from './pages/admin/BestBallAdmin';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -57,6 +62,12 @@ function App() {
                 <Route path="bracket" element={<Bracket />} />
               </Route>
 
+              {/* Best Ball */}
+              <Route path="/best-ball" element={<BestBall />} />
+              <Route path="/best-ball/lineup" element={<BestBallRoster />} />
+              <Route path="/best-ball/leaderboard" element={<BestBallLeaderboard />} />
+              <Route path="/best-ball/users/:userId" element={<BestBallEntry />} />
+
               {/* Admin — wrapped in AdminRoute guard + AdminLayout */}
               <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
                 <Route index element={<AdminDashboard />} />
@@ -64,6 +75,7 @@ function App() {
                 <Route path="leagues" element={<AdminLeagues />} />
                 <Route path="leagues/:id" element={<AdminLeagueDetail />} />
                 <Route path="tournament" element={<AdminTournament />} />
+                <Route path="best-ball" element={<BestBallAdmin />} />
               </Route>
             </Route>
 
