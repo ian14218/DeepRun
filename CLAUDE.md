@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-DeepRun is a March Madness Fantasy League web app. Groups of 4-20 friends snake-draft NCAA tournament players, then track points across the tournament. The core strategy: the tournament is single-elimination, so players on teams that go deeper play more games and score more total points.
+DeepRun is a March Madness Fantasy League web app with two game modes:
+
+1. **League Draft** — Groups of 4-20 friends snake-draft NCAA tournament players, then track points across the tournament. The core strategy: the tournament is single-elimination, so players on teams that go deeper play more games and score more total points.
+
+2. **Best Ball** — A global salary-cap contest where every user competes in a single pool. Each user builds an 8-player lineup with an $8,000 virtual budget. Players are priced using a formula based on PPG, minutes, and tournament seed. No league needed — compete against the entire platform.
 
 ## Monorepo Structure
 
@@ -39,7 +43,7 @@ Requires PostgreSQL. Create databases `mmfantasy` and `mmfantasy_test`, run migr
 
 ### Migrations
 
-Numbered SQL files in `database/migrations/` (e.g., `001_initial_schema.sql`, `002_add_is_bot.sql`). Run sequentially with `psql -U postgres -d mmfantasy -f database/migrations/NNN_name.sql`. When adding schema changes, create the next numbered file. All tables use UUID primary keys (`uuid_generate_v4()`).
+Numbered SQL files in `database/migrations/` (001 through 007). Run sequentially with `psql -U postgres -d mmfantasy -f database/migrations/NNN_name.sql`. When adding schema changes, create the next numbered file (008+). All tables use UUID primary keys (`uuid_generate_v4()`). Current migrations: initial schema, is_bot, season stats, is_admin, draft timer, draft messages, best ball (5 tables + config seed data).
 
 ### Testing Conventions
 
@@ -53,12 +57,12 @@ Layered MVC: **routes → services → models → pg**
 - `server.js` — HTTP server + Socket.IO bootstrap
 - `app.js` — Express app, mounts all route groups under `/api/`
 - `db.js` — PostgreSQL connection pool (uses `DATABASE_URL` / `DATABASE_URL_TEST`)
-- `routes/` — Express routers (auth, league, draft, player, standings, admin)
-- `services/` — Business logic (draft snake ordering, scoring, elimination cascade, ESPN sync)
+- `routes/` — Express routers (auth, league, draft, player, standings, admin, bestBall)
+- `services/` — Business logic (draft snake ordering, scoring, elimination cascade, ESPN sync, Best Ball pricing/roster, simulation)
 - `models/` — Raw SQL queries via `pg` pool (no ORM)
 - `middleware/` — JWT auth (`auth.middleware.js`), admin role check, global error handler
 - `socket/draftSocket.js` — Socket.IO handlers for live draft rooms
-- `jobs/` — Scheduled tasks (stat sync from ESPN every 5 minutes)
+- `jobs/` — Scheduled tasks (stat sync from ESPN every 5 minutes, auto-updates Best Ball scores)
 
 ### Frontend (client/src/)
 - `App.jsx` — React Router setup with nested layouts
@@ -67,8 +71,10 @@ Layered MVC: **routes → services → models → pg**
 - `services/` — Axios-based API layer; `api.js` has JWT interceptor that attaches token to all requests
 - `components/ui/` — Radix UI primitives (button, card, dialog, etc.)
 - `components/layout/` — AppLayout, LeagueLayout (sidebar), AdminLayout
-- `components/` — Feature components (DraftBoard, PlayerList, StandingsTable)
+- `components/` — Feature components (DraftBoard, PlayerList, StandingsTable, BracketView, TeamLogo)
+- `components/bestball/` — Best Ball UI components (PlayerMarket, RosterPanel, BudgetBar, PriceTag)
 - `pages/` — Route pages; `pages/admin/` for admin dashboard
+- `pages/BestBall*.jsx` — Best Ball hub, roster builder, leaderboard, and entry detail pages
 - `lib/utils.js` — `cn()` helper (clsx + tailwind-merge)
 - Path alias: `@/` maps to `client/src/`
 
@@ -82,6 +88,10 @@ Layered MVC: **routes → services → models → pg**
 
 **Real-time Draft**: Socket.IO events (`draft:pick`, `draft:turn`, `draft:complete`) broadcast to league draft rooms. Server exposes `req.app.io` for emitting from route handlers.
 
+**Best Ball** (`server/src/services/bestBall.service.js`, `bestBallPricing.service.js`): Salary-cap contest with transactional roster management using `FOR UPDATE` row locks. Pricing uses a 5-step pipeline (minutes weight → weighted PPG → seed multiplier → normalization → convex curve). Config stored in `best_ball_config` table. Auto-provisions a contest when tournament data exists. Contest lifecycle: upcoming → open → live → completed (auto-transitions to `live` on first simulation). Scores updated via `updateScores()` after stat sync and simulation.
+
+**Simulation** (`server/src/services/simulation.service.js`): Simulates tournament rounds with bracket-aware matchups. Generates random `player_game_stats`, eliminates losing teams, and auto-updates Best Ball scores. Used via admin UI or CLI (`npm run simulate`).
+
 ### API Routes
 
 All routes are mounted under `/api/` in `app.js`:
@@ -91,7 +101,10 @@ All routes are mounted under `/api/` in `app.js`:
 - `/api/leagues/:id/draft` — start draft, make picks, get draft state
 - `/api/players` — search/filter players (paginated)
 - `/api/leagues/:id/standings` — leaderboard, team rosters, scoreboard
-- `/api/admin` — system stats, user/league management (requires admin middleware)
+- `/api/admin` — system stats, user/league management, tournament simulation (requires admin middleware)
+- `/api/best-ball` — Best Ball contest, entries, roster management, player market, leaderboard, admin endpoints
+- `/api/tournaments` — tournament teams and bracket data
+- `/api/chat` — draft room chat messages
 
 ## Tech Stack
 
@@ -109,4 +122,4 @@ All routes are mounted under `/api/` in `app.js`:
 
 ## Specs
 
-`SPEC.md` contains the original 11-phase feature specification. `SPEC_V2.md` has enhancement/polish phases.
+`SPEC.md` contains the original 11-phase feature specification. `SPEC_V2.md` has enhancement/polish phases. `SPEC_BEST_BALL.md` has the Best Ball salary-cap contest specification.
