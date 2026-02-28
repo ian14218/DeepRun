@@ -122,4 +122,4 @@ All routes are mounted under `/api/` in `app.js`:
 
 ## Specs
 
-`SPEC.md` contains the original 11-phase feature specification. `SPEC_V2.md` has enhancement/polish phases. `SPEC_BEST_BALL.md` has the Best Ball salary-cap contest specification.
+`spec/SPEC.md` contains the original 11-phase feature specification. `spec/SPEC_V2.md` has enhancement/polish phases. `spec/SPEC_BEST_BALL.md` has the Best Ball salary-cap contest specification.
