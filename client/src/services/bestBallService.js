@@ -30,8 +30,10 @@ export async function deleteEntry(entryId) {
   return res.data;
 }
 
-export async function addPlayer(entryId, playerId) {
-  const res = await api.post(`/api/best-ball/entries/${entryId}/players`, { playerId });
+export async function addPlayer(entryId, playerId, pairedPlayerId = null) {
+  const body = { playerId };
+  if (pairedPlayerId) body.pairedPlayerId = pairedPlayerId;
+  const res = await api.post(`/api/best-ball/entries/${entryId}/players`, body);
   return res.data;
 }
 

@@ -47,3 +47,15 @@ export function simulateTournamentRound() {
 export function resetSimulation(includeDrafts = false) {
   return api.post('/api/admin/tournament/reset-simulation', { includeDrafts }).then((r) => r.data);
 }
+
+export function getFirstFourPairs() {
+  return api.get('/api/admin/tournament/first-four-pairs').then((r) => r.data);
+}
+
+export function createFirstFourPair(teamAId, teamBId) {
+  return api.post('/api/admin/tournament/first-four-pairs', { teamAId, teamBId }).then((r) => r.data);
+}
+
+export function removeFirstFourPair(teamId) {
+  return api.delete(`/api/admin/tournament/first-four-pairs/${teamId}`).then((r) => r.data);
+}

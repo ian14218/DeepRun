@@ -52,7 +52,24 @@ async function createEntry(contestId, userId) {
   return bestBallModel.createEntry(contestId, userId, contest.budget);
 }
 
-async function addPlayer(entryId, playerId) {
+async function addPlayer(entryId, playerId, pairedPlayerId = null) {
+  // Validate First Four pairing before entering transaction
+  const playerTeamResult = await pool.query(
+    `SELECT tt.is_first_four, tt.first_four_partner_id
+     FROM players p JOIN tournament_teams tt ON tt.id = p.team_id WHERE p.id = $1`,
+    [playerId]
+  );
+  const playerTeam = playerTeamResult.rows[0];
+  if (playerTeam && playerTeam.is_first_four) {
+    if (!pairedPlayerId) throw createError('First Four player requires a paired player from the partner team', 400);
+    const pairedTeamResult = await pool.query('SELECT team_id FROM players WHERE id = $1', [pairedPlayerId]);
+    if (!pairedTeamResult.rows[0] || pairedTeamResult.rows[0].team_id !== playerTeam.first_four_partner_id) {
+      throw createError('Paired player must be from the First Four partner team', 400);
+    }
+  } else if (pairedPlayerId) {
+    throw createError('Cannot pair a player who is not in the First Four', 400);
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -75,32 +92,52 @@ async function addPlayer(entryId, playerId) {
       throw createError('Roster is full', 400);
     }
 
-    // Check not already on roster
+    // Check not already on roster (check both columns for primary and paired)
     const dupResult = await client.query(
-      'SELECT id FROM best_ball_roster_players WHERE entry_id = $1 AND player_id = $2',
+      'SELECT id FROM best_ball_roster_players WHERE entry_id = $1 AND (player_id = $2 OR paired_player_id = $2)',
       [entryId, playerId]
     );
     if (dupResult.rows.length > 0) {
       throw createError('Player already on roster', 400);
     }
 
-    // Look up price
+    if (pairedPlayerId) {
+      const dupPairedResult = await client.query(
+        'SELECT id FROM best_ball_roster_players WHERE entry_id = $1 AND (player_id = $2 OR paired_player_id = $2)',
+        [entryId, pairedPlayerId]
+      );
+      if (dupPairedResult.rows.length > 0) {
+        throw createError('Paired player already on roster', 400);
+      }
+    }
+
+    // Look up price — for First Four pairs, use the higher of the two prices
     const priceResult = await client.query(
       'SELECT price FROM best_ball_player_prices WHERE contest_id = $1 AND player_id = $2',
       [entry.contest_id, playerId]
     );
     if (!priceResult.rows[0]) throw createError('Player not found in this contest', 404);
-    const price = priceResult.rows[0].price;
+    let price = priceResult.rows[0].price;
+
+    if (pairedPlayerId) {
+      const pairedPriceResult = await client.query(
+        'SELECT price FROM best_ball_player_prices WHERE contest_id = $1 AND player_id = $2',
+        [entry.contest_id, pairedPlayerId]
+      );
+      if (pairedPriceResult.rows[0]) {
+        price = Math.max(price, pairedPriceResult.rows[0].price);
+      }
+    }
 
     // Check budget
     if (entry.budget_remaining < price) {
       throw createError('Insufficient budget', 400);
     }
 
-    // Insert roster player
+    // Insert roster player with paired_player_id
     await client.query(
-      'INSERT INTO best_ball_roster_players (entry_id, player_id, purchase_price) VALUES ($1, $2, $3)',
-      [entryId, playerId, price]
+      'INSERT INTO best_ball_roster_players (entry_id, player_id, purchase_price, paired_player_id) VALUES ($1, $2, $3, $4)',
+      [entryId, playerId, price, pairedPlayerId]
     );
 
     // Update budget and completeness
@@ -137,9 +174,9 @@ async function removePlayer(entryId, playerId) {
     if (!entry) throw createError('Entry not found', 404);
     if (entry.status !== 'open') throw createError('Contest is not open', 400);
 
-    // Remove player
+    // Remove player (removing either primary or paired player removes the whole pair)
     const removeResult = await client.query(
-      'DELETE FROM best_ball_roster_players WHERE entry_id = $1 AND player_id = $2 RETURNING purchase_price',
+      'DELETE FROM best_ball_roster_players WHERE entry_id = $1 AND (player_id = $2 OR paired_player_id = $2) RETURNING purchase_price',
       [entryId, playerId]
     );
     if (removeResult.rows.length === 0) {
@@ -176,14 +213,16 @@ async function deleteEntry(entryId, userId) {
 }
 
 async function updateScores(contestId) {
-  // Bulk update all complete entries' scores in one query
+  // Bulk update all complete entries' scores in one query (include paired player stats)
   await pool.query(
     `UPDATE best_ball_entries e
      SET total_score = COALESCE(sub.total, 0), updated_at = NOW()
      FROM (
-       SELECT rp.entry_id, SUM(pgs.points)::int AS total
+       SELECT rp.entry_id,
+              (COALESCE(SUM(pgs1.points), 0) + COALESCE(SUM(pgs2.points), 0))::int AS total
        FROM best_ball_roster_players rp
-       JOIN player_game_stats pgs ON pgs.player_id = rp.player_id
+       LEFT JOIN player_game_stats pgs1 ON pgs1.player_id = rp.player_id
+       LEFT JOIN player_game_stats pgs2 ON pgs2.player_id = rp.paired_player_id
        GROUP BY rp.entry_id
      ) sub
      WHERE e.id = sub.entry_id
@@ -204,26 +243,33 @@ async function getEntryDetail(entryId) {
 
   const roster = await bestBallModel.getRoster(entryId);
 
-  // Get points per player from game stats
+  // Get points per player from game stats (include paired player stats)
   const statsResult = await pool.query(
-    `SELECT rp.player_id,
-            COALESCE(SUM(pgs.points), 0)::int AS total_points,
+    `SELECT rp.player_id, rp.paired_player_id,
+            COALESCE(SUM(pgs1.points), 0)::int AS primary_points,
+            COALESCE(SUM(pgs2.points), 0)::int AS paired_points,
             json_agg(
-              json_build_object('round', pgs.tournament_round, 'points', pgs.points)
-              ORDER BY pgs.game_date
-            ) FILTER (WHERE pgs.id IS NOT NULL) AS round_points
+              json_build_object('round', pgs1.tournament_round, 'points', pgs1.points)
+              ORDER BY pgs1.game_date
+            ) FILTER (WHERE pgs1.id IS NOT NULL) AS round_points,
+            json_agg(
+              json_build_object('round', pgs2.tournament_round, 'points', pgs2.points)
+              ORDER BY pgs2.game_date
+            ) FILTER (WHERE pgs2.id IS NOT NULL) AS paired_round_points
      FROM best_ball_roster_players rp
-     LEFT JOIN player_game_stats pgs ON pgs.player_id = rp.player_id
+     LEFT JOIN player_game_stats pgs1 ON pgs1.player_id = rp.player_id
+     LEFT JOIN player_game_stats pgs2 ON pgs2.player_id = rp.paired_player_id
      WHERE rp.entry_id = $1
-     GROUP BY rp.player_id`,
+     GROUP BY rp.player_id, rp.paired_player_id`,
     [entryId]
   );
 
   const statsMap = {};
   for (const row of statsResult.rows) {
     statsMap[row.player_id] = {
-      totalPoints: row.total_points,
+      totalPoints: row.primary_points + row.paired_points,
       roundPoints: row.round_points || [],
+      pairedRoundPoints: row.paired_round_points || [],
     };
   }
 
@@ -231,6 +277,7 @@ async function getEntryDetail(entryId) {
     ...p,
     total_points: statsMap[p.player_id]?.totalPoints || 0,
     round_points: statsMap[p.player_id]?.roundPoints || [],
+    paired_round_points: statsMap[p.player_id]?.pairedRoundPoints || [],
   }));
 
   const rank = await bestBallModel.getEntryRank(entryId);

@@ -1,5 +1,7 @@
 const express = require('express');
 const playerService = require('../services/player.service');
+const tournamentTeamModel = require('../models/tournamentTeam.model');
+const playerModel = require('../models/player.model');
 
 const router = express.Router();
 
@@ -24,6 +26,22 @@ router.get('/tournaments/teams', async (req, res) => {
   try {
     const teams = await playerService.getTournamentTeams();
     return res.json(teams);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/players/first-four-partners/:teamId — returns players on the partner First Four team
+router.get('/players/first-four-partners/:teamId', async (req, res) => {
+  try {
+    const team = await tournamentTeamModel.findById(req.params.teamId);
+    if (!team) return res.status(404).json({ error: 'Team not found' });
+    if (!team.is_first_four || !team.first_four_partner_id) {
+      return res.status(400).json({ error: 'Team is not a First Four team' });
+    }
+    const partnerTeam = await tournamentTeamModel.findById(team.first_four_partner_id);
+    const players = await playerModel.findByTeamId(team.first_four_partner_id);
+    return res.json({ players, partnerTeam: { name: partnerTeam.name, external_id: partnerTeam.external_id, seed: partnerTeam.seed, region: partnerTeam.region } });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

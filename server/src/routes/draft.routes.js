@@ -35,11 +35,11 @@ router.post('/start', async (req, res) => {
 
 // POST /api/leagues/:id/draft/pick
 router.post('/pick', async (req, res) => {
-  const { player_id } = req.body;
+  const { player_id, paired_player_id } = req.body;
   if (!player_id) return res.status(400).json({ error: 'player_id is required' });
 
   try {
-    const pick = await draftService.makePick(req.params.id, req.user.id, player_id);
+    const pick = await draftService.makePick(req.params.id, req.user.id, player_id, paired_player_id || null);
 
     // Emit real-time events
     const io = req.app.io;
@@ -47,6 +47,7 @@ router.post('/pick', async (req, res) => {
       io.to(`league:${req.params.id}`).emit('draft:pick', {
         pick_number:    pick.pick_number,
         player_id:      pick.player_id,
+        paired_player_id: pick.paired_player_id,
         member_id:      pick.member_id,
         draft_position: pick.draft_position,
       });

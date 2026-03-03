@@ -4,6 +4,7 @@ const { requireAdmin } = require('../middleware/admin.middleware');
 const adminService = require('../services/admin.service');
 const simulationService = require('../services/simulation.service');
 const userModel = require('../models/user.model');
+const tournamentTeamModel = require('../models/tournamentTeam.model');
 
 const router = express.Router();
 
@@ -132,6 +133,38 @@ router.post('/tournament/simulate-round', async (req, res) => {
   try {
     const result = await simulationService.simulateRound();
     res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// First Four pair management
+router.post('/tournament/first-four-pairs', async (req, res) => {
+  try {
+    const { teamAId, teamBId } = req.body;
+    if (!teamAId || !teamBId) {
+      return res.status(400).json({ error: 'teamAId and teamBId are required' });
+    }
+    await tournamentTeamModel.setFirstFourPartner(teamAId, teamBId);
+    res.json({ message: 'First Four pair created' });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get('/tournament/first-four-pairs', async (req, res) => {
+  try {
+    const pairs = await tournamentTeamModel.getFirstFourPairs();
+    res.json(pairs);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.delete('/tournament/first-four-pairs/:teamId', async (req, res) => {
+  try {
+    await tournamentTeamModel.clearFirstFourPair(req.params.teamId);
+    res.json({ message: 'First Four pair removed' });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }

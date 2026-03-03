@@ -140,7 +140,7 @@ describe('BestBallRoster', () => {
     fireEvent.click(addButtons[0]);
 
     await waitFor(() => {
-      expect(bestBallService.addPlayer).toHaveBeenCalledWith('entry-1', 'p2');
+      expect(bestBallService.addPlayer).toHaveBeenCalledWith('entry-1', 'p2', null);
     });
   });
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getPlayerMarket } from '@/services/bestBallService';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -12,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import PriceTag from './PriceTag';
 import TeamLogo from '@/components/TeamLogo';
+import FirstFourPairDialog from '@/components/FirstFourPairDialog';
 import { Search, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd, readOnly }) {
@@ -22,9 +24,12 @@ export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd
   const [maxPrice, setMaxPrice] = useState('');
   const [sortBy, setSortBy] = useState('price');
   const [page, setPage] = useState(1);
+  const [ffDialogPlayer, setFfDialogPlayer] = useState(null);
   const limit = 25;
 
-  const rosteredIds = new Set(roster.map((r) => r.player_id));
+  const rosteredIds = new Set(
+    roster.flatMap((r) => [r.player_id, r.paired_player_id].filter(Boolean))
+  );
 
   const fetchPlayers = useCallback(async () => {
     setLoading(true);
@@ -63,6 +68,19 @@ export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd
     { value: 'seed', label: 'Seed' },
     { value: 'name', label: 'Name' },
   ];
+
+  function handleAddClick(player) {
+    if (player.is_first_four) {
+      setFfDialogPlayer(player);
+    } else {
+      onAdd(player.player_id);
+    }
+  }
+
+  function handleFfConfirm(primaryId, pairedId) {
+    onAdd(primaryId, pairedId);
+    setFfDialogPlayer(null);
+  }
 
   return (
     <div className="space-y-4">
@@ -138,7 +156,14 @@ export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd
                       <div className="flex items-center gap-2">
                         <TeamLogo externalId={player.team_external_id} teamName={player.team_name} size={18} />
                         <div>
-                          <p className="font-medium">{player.name}</p>
+                          <p className="font-medium">
+                            {player.name}
+                            {player.is_first_four && (
+                              <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0 bg-amber-500/15 text-amber-600 border-amber-500/30">
+                                FF
+                              </Badge>
+                            )}
+                          </p>
                           <p className="text-xs text-muted-foreground sm:hidden">{player.team_name}</p>
                         </div>
                       </div>
@@ -159,7 +184,7 @@ export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd
                           size="sm"
                           variant="outline"
                           disabled={isRostered || tooExpensive}
-                          onClick={() => onAdd(player.player_id)}
+                          onClick={() => handleAddClick(player)}
                         >
                           {isRostered ? 'Added' : 'Add'}
                         </Button>
@@ -202,6 +227,15 @@ export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd
           </div>
         </div>
       )}
+
+      <FirstFourPairDialog
+        open={!!ffDialogPlayer}
+        onOpenChange={(open) => !open && setFfDialogPlayer(null)}
+        primaryPlayer={ffDialogPlayer}
+        onConfirm={handleFfConfirm}
+        mode="bestball"
+        pickedPlayerIds={[...rosteredIds]}
+      />
     </div>
   );
 }

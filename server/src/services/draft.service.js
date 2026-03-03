@@ -2,6 +2,7 @@ const pool = require('../db');
 const leagueModel = require('../models/league.model');
 const draftPickModel = require('../models/draftPick.model');
 const playerModel = require('../models/player.model');
+const tournamentTeamModel = require('../models/tournamentTeam.model');
 
 // ─── Draft timers (in-memory) ────────────────────────────────────────────────
 const draftTimers = new Map(); // leagueId → { timeout, expiresAt, paused, remainingOnPause, io, disabled }
@@ -116,21 +117,38 @@ async function autoPickOnTimeout(leagueId, io) {
   const onTheClock = members.find((m) => m.draft_position === currentPos);
   if (!onTheClock) return;
 
-  // Pick a random available player
-  const draftedPlayerIds = picks.map((p) => p.player_id);
+  // Pick a random available player (exclude both primary and paired IDs)
+  const draftedPlayerIds = picks.flatMap((p) => [p.player_id, p.paired_player_id].filter(Boolean));
   const availableResult = await pool.query(
-    `SELECT id FROM players WHERE id != ALL($1::uuid[]) ORDER BY RANDOM() LIMIT 1`,
+    `SELECT p.id, tt.is_first_four, tt.first_four_partner_id
+     FROM players p
+     JOIN tournament_teams tt ON tt.id = p.team_id
+     WHERE p.id != ALL($1::uuid[])
+     ORDER BY RANDOM() LIMIT 1`,
     [draftedPlayerIds]
   );
   if (availableResult.rows.length === 0) return;
 
-  const playerId = availableResult.rows[0].id;
-  const pick = await makePick(leagueId, onTheClock.user_id, playerId);
+  const chosen = availableResult.rows[0];
+  let pairedPlayerId = null;
+  if (chosen.is_first_four) {
+    const partnerResult = await pool.query(
+      `SELECT p.id FROM players p
+       WHERE p.team_id = $1 AND p.id != ALL($2::uuid[])
+       ORDER BY RANDOM() LIMIT 1`,
+      [chosen.first_four_partner_id, draftedPlayerIds]
+    );
+    pairedPlayerId = partnerResult.rows[0]?.id || null;
+  }
+
+  const playerId = chosen.id;
+  const pick = await makePick(leagueId, onTheClock.user_id, playerId, pairedPlayerId);
 
   if (io) {
     io.to(`league:${leagueId}`).emit('draft:pick', {
       pick_number: pick.pick_number,
       player_id: pick.player_id,
+      paired_player_id: pick.paired_player_id,
       member_id: pick.member_id,
       draft_position: pick.draft_position,
       auto_picked: true,
@@ -230,9 +248,27 @@ async function startDraft(leagueId, userId) {
   return { draft_status: 'in_progress', draft_order, draft_timer_seconds: league.draft_timer_seconds ?? 90 };
 }
 
-async function makePick(leagueId, userId, playerId) {
+async function makePick(leagueId, userId, playerId, pairedPlayerId = null) {
   // Read members outside the transaction (league_members don't change during a pick)
   const members = await leagueModel.findMembersByLeague(leagueId);
+
+  // Validate First Four pairing requirements before entering transaction
+  const player = await playerModel.findById(playerId);
+  if (!player) { const e = new Error('Player not found'); e.status = 404; throw e; }
+
+  const team = await tournamentTeamModel.findById(player.team_id);
+  if (team && team.is_first_four) {
+    if (!pairedPlayerId) {
+      const e = new Error('First Four player requires a paired player from the partner team'); e.status = 400; throw e;
+    }
+    const pairedPlayer = await playerModel.findById(pairedPlayerId);
+    if (!pairedPlayer) { const e = new Error('Paired player not found'); e.status = 404; throw e; }
+    if (pairedPlayer.team_id !== team.first_four_partner_id) {
+      const e = new Error('Paired player must be from the First Four partner team'); e.status = 400; throw e;
+    }
+  } else if (pairedPlayerId) {
+    const e = new Error('Cannot pair a player who is not in the First Four'); e.status = 400; throw e;
+  }
 
   const client = await pool.connect();
   let pick, onTheClock, snakeOrder, pickNumber, complete;
@@ -241,8 +277,6 @@ async function makePick(leagueId, userId, playerId) {
     await client.query('BEGIN');
 
     // Lock the league row for the duration of the transaction.
-    // Any concurrent makePick for the same league will block here until we COMMIT,
-    // eliminating the read-check-write race condition.
     const leagueResult = await client.query(
       'SELECT * FROM leagues WHERE id = $1 FOR UPDATE',
       [leagueId]
@@ -275,21 +309,33 @@ async function makePick(leagueId, userId, playerId) {
       const e = new Error('It is not your turn'); e.status = 403; throw e;
     }
 
+    // Check primary player not already drafted (as primary or paired)
     const dupResult = await client.query(
-      'SELECT 1 FROM draft_picks WHERE league_id = $1 AND player_id = $2',
+      'SELECT 1 FROM draft_picks WHERE league_id = $1 AND (player_id = $2 OR paired_player_id = $2)',
       [leagueId, playerId]
     );
     if (dupResult.rowCount > 0) {
       const e = new Error('Player has already been drafted'); e.status = 400; throw e;
     }
 
+    // Check paired player not already drafted
+    if (pairedPlayerId) {
+      const dupPairedResult = await client.query(
+        'SELECT 1 FROM draft_picks WHERE league_id = $1 AND (player_id = $2 OR paired_player_id = $2)',
+        [leagueId, pairedPlayerId]
+      );
+      if (dupPairedResult.rowCount > 0) {
+        const e = new Error('Paired player has already been drafted'); e.status = 400; throw e;
+      }
+    }
+
     pickNumber = picksMade + 1;
     const round = Math.ceil(pickNumber / league.team_count);
 
     const pickResult = await client.query(
-      `INSERT INTO draft_picks (league_id, member_id, player_id, pick_number, round)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [leagueId, onTheClock.id, playerId, pickNumber, round]
+      `INSERT INTO draft_picks (league_id, member_id, player_id, pick_number, round, paired_player_id)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [leagueId, onTheClock.id, playerId, pickNumber, round, pairedPlayerId]
     );
     pick = pickResult.rows[0];
 
@@ -353,11 +399,14 @@ async function getDraftState(leagueId) {
     }
   }
 
+  // Count total drafted player IDs (primary + paired)
+  const draftedCount = picks.reduce((n, p) => n + 1 + (p.paired_player_id ? 1 : 0), 0);
+
   return {
     status:                   league.draft_status,
     picks,
     current_turn,
-    available_players_count:  availablePlayersCount - picks.length,
+    available_players_count:  availablePlayersCount - draftedCount,
   };
 }
 
@@ -381,27 +430,42 @@ async function autoPick(leagueId, io) {
     const onTheClock = members.find((m) => m.draft_position === currentPos);
     if (!onTheClock || !onTheClock.is_bot) break; // human's turn — stop
 
-    // Pick a random available player
-    const draftedPlayerIds = picks.map((p) => p.player_id);
+    // Pick a random available player (exclude both primary and paired IDs)
+    const draftedPlayerIds = picks.flatMap((p) => [p.player_id, p.paired_player_id].filter(Boolean));
     const availableResult = await pool.query(
-      `SELECT id FROM players
-       WHERE id != ALL($1::uuid[])
+      `SELECT p.id, tt.is_first_four, tt.first_four_partner_id
+       FROM players p
+       JOIN tournament_teams tt ON tt.id = p.team_id
+       WHERE p.id != ALL($1::uuid[])
        ORDER BY RANDOM() LIMIT 1`,
       [draftedPlayerIds]
     );
 
     if (availableResult.rows.length === 0) break; // no players left
 
-    const playerId = availableResult.rows[0].id;
+    const chosen = availableResult.rows[0];
+    let pairedPlayerId = null;
+    if (chosen.is_first_four) {
+      const partnerResult = await pool.query(
+        `SELECT p.id FROM players p
+         WHERE p.team_id = $1 AND p.id != ALL($2::uuid[])
+         ORDER BY RANDOM() LIMIT 1`,
+        [chosen.first_four_partner_id, draftedPlayerIds]
+      );
+      pairedPlayerId = partnerResult.rows[0]?.id || null;
+    }
+
+    const playerId = chosen.id;
 
     // Use makePick with the bot's user_id
-    const pick = await makePick(leagueId, onTheClock.user_id, playerId);
+    const pick = await makePick(leagueId, onTheClock.user_id, playerId, pairedPlayerId);
 
     // Emit socket events
     if (io) {
       io.to(`league:${leagueId}`).emit('draft:pick', {
         pick_number:    pick.pick_number,
         player_id:      pick.player_id,
+        paired_player_id: pick.paired_player_id,
         member_id:      pick.member_id,
         draft_position: pick.draft_position,
       });

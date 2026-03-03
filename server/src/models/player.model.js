@@ -30,6 +30,7 @@ async function findAll({ search, teamName, page = 1, limit = 100 } = {}) {
       `SELECT p.*, tt.name AS team_name, tt.seed, tt.region,
               tt.is_eliminated AS team_is_eliminated, tt.wins,
               tt.external_id AS team_external_id,
+              tt.is_first_four, tt.first_four_partner_id,
               COALESCE(gs.games_played, 0)::int AS games_played,
               COALESCE(gs.total_points, 0)::int AS total_points
        FROM players p

@@ -127,14 +127,14 @@ export default function DraftRoom() {
     }
   }
 
-  function handlePickRequest(playerId) {
-    setPendingPick(playerId);
+  function handlePickRequest(playerId, pairedPlayerId = null) {
+    setPendingPick({ playerId, pairedPlayerId });
   }
 
   async function handleConfirmPick() {
     if (!pendingPick) return;
     try {
-      await makePick(leagueId, pendingPick);
+      await makePick(leagueId, pendingPick.playerId, pendingPick.pairedPlayerId);
       toast.success('Pick made!');
     } catch (e) {
       toast.error(e.response?.data?.error || e.message);
@@ -174,13 +174,11 @@ export default function DraftRoom() {
 
   const isCommissioner = league.commissioner_id === user.id;
   const isMyTurn = draftState.current_turn?.user_id === user.id;
-  const pickedPlayerIds = draftState.picks.map((p) => p.player_id);
+  const pickedPlayerIds = draftState.picks.flatMap((p) => [p.player_id, p.paired_player_id].filter(Boolean));
   const totalPicks = league.team_count * league.roster_size;
 
-  // Find player name for pending pick confirmation
-  const pendingPickName = pendingPick
-    ? draftState.picks.find(() => false)?.player_name || 'this player'
-    : '';
+  // Find player name for pending pick confirmation — not used for display anymore
+  const pendingPickName = 'this player';
 
   // Completed state
   if (draftState.status === 'completed') {
@@ -212,6 +210,8 @@ export default function DraftRoom() {
           teamCount={league.team_count}
           rosterSize={league.roster_size}
           currentUserId={user.id}
+          members={league.members}
+          currentTurn={null}
         />
       </div>
     );
@@ -409,10 +409,12 @@ export default function DraftRoom() {
             teamCount={league.team_count}
             rosterSize={league.roster_size}
             currentUserId={user.id}
+            members={league.members}
+            currentTurn={draftState.current_turn}
           />
         </div>
-        <div className="flex flex-col gap-4 lg:h-[calc(100vh-280px)] lg:min-h-[400px]">
-          <div className="flex-1 min-h-0">
+        <div className="flex flex-col gap-4 lg:h-[calc(100vh-280px)] lg:min-h-[400px] min-w-0">
+          <div className="flex-1 min-h-0 min-w-0">
             <PlayerList
               canPick={isMyTurn}
               onPick={handlePickRequest}
@@ -431,7 +433,8 @@ export default function DraftRoom() {
           <DialogHeader>
             <DialogTitle>Confirm Pick</DialogTitle>
             <DialogDescription>
-              Are you sure you want to draft {pendingPickName || 'this player'}?
+              Are you sure you want to draft {pendingPickName}?
+              {pendingPick?.pairedPlayerId && ' (First Four pair)'}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

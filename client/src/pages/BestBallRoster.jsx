@@ -40,10 +40,10 @@ export default function BestBallRoster() {
     fetchData();
   }, [fetchData]);
 
-  const handleAdd = async (playerId) => {
+  const handleAdd = async (playerId, pairedPlayerId = null) => {
     if (!entry) return;
     try {
-      const updated = await addPlayer(entry.id, playerId);
+      const updated = await addPlayer(entry.id, playerId, pairedPlayerId);
       setEntry(updated);
       // Refresh lineup to get full roster data
       const lineup = await getMyLineup(contest.id);

@@ -22,6 +22,7 @@ const FF_PAIRINGS = [
 
 function getRoundName(teamCount) {
   const rounds = {
+    68: 'First Four',
     64: 'Round of 64',
     32: 'Round of 32',
     16: 'Sweet 16',
@@ -33,10 +34,11 @@ function getRoundName(teamCount) {
 }
 
 function getRoundNum(teamCount) {
-  return { 64: 1, 32: 2, 16: 3, 8: 4, 4: 5, 2: 6 }[teamCount] || null;
+  return { 68: 0, 64: 1, 32: 2, 16: 3, 8: 4, 4: 5, 2: 6 }[teamCount] ?? null;
 }
 
 const ROUND_SHORT = {
+  'First Four': 'FF4',
   'Round of 64': 'R64',
   'Round of 32': 'R32',
   'Sweet 16': 'S16',
@@ -57,11 +59,29 @@ function buildBracketMatchups(allTeams, roundNum) {
     byRegion[team.region].push(team);
   }
 
+  // First Four: pair teams by first_four_partner_id
+  if (roundNum === 0) {
+    const matchups = [];
+    const seen = new Set();
+    for (const team of allTeams) {
+      if (team.is_first_four && !team.is_eliminated && !seen.has(team.id)) {
+        const partner = allTeams.find((t) => t.id === team.first_four_partner_id);
+        if (partner && !partner.is_eliminated) {
+          matchups.push({ teamA: team, teamB: partner });
+          seen.add(team.id);
+          seen.add(partner.id);
+        }
+      }
+    }
+    return matchups;
+  }
+
   if (roundNum === 1) {
     const matchups = [];
     for (const region of REGIONS) {
       const bySeed = {};
-      (byRegion[region] || []).forEach((t) => { bySeed[t.seed] = t; });
+      // Filter out eliminated teams (First Four losers) for R64
+      (byRegion[region] || []).filter((t) => !t.is_eliminated).forEach((t) => { bySeed[t.seed] = t; });
       for (const [seedA, seedB] of R64_SEED_MATCHUPS) {
         const teamA = bySeed[seedA];
         const teamB = bySeed[seedB];
@@ -75,7 +95,8 @@ function buildBracketMatchups(allTeams, roundNum) {
     const matchups = [];
     for (const region of REGIONS) {
       const bySeed = {};
-      (byRegion[region] || []).forEach((t) => { bySeed[t.seed] = t; });
+      // Filter out eliminated teams when building seed map
+      (byRegion[region] || []).filter((t) => !t.is_eliminated).forEach((t) => { bySeed[t.seed] = t; });
 
       // Determine R64 winners in bracket order
       let bracketSlots = R64_SEED_MATCHUPS.map(([seedA, seedB]) => {
@@ -179,32 +200,39 @@ async function simulateRound() {
     const scoreB = statsB.reduce((s, x) => s + x.points, 0);
     const aWins = scoreA >= scoreB;
 
-    const short = ROUND_SHORT[roundName] || 'SIM';
-    const idA = String(teamA.id).slice(0, 8);
-    const idB = String(teamB.id).slice(0, 8);
-    const externalGameId = `sim-${short}-${idA}-${idB}`;
-
-    // Insert player_game_stats for all players
-    const statInserts = [];
-    for (const { player, points } of statsA) {
-      statInserts.push(
-        playerGameStats.create(player.id, today, teamB.id, points, roundName, externalGameId)
-      );
-    }
-    for (const { player, points } of statsB) {
-      statInserts.push(
-        playerGameStats.create(player.id, today, teamA.id, points, roundName, externalGameId)
-      );
-    }
-    await Promise.all(statInserts);
-
     // Eliminate loser
     const loserId = aWins ? teamB.id : teamA.id;
     const winnerId = aWins ? teamA.id : teamB.id;
     await eliminationService.eliminateTeam(loserId, roundName);
 
-    // Update winner wins
-    await tournamentTeamModel.updateWinsFromStats(winnerId);
+    // First Four play-in games don't count toward scoring — skip stat insertion.
+    // Only record player_game_stats for R64 onward.
+    if (roundName !== 'First Four') {
+      const short = ROUND_SHORT[roundName] || 'SIM';
+      const idA = String(teamA.id).slice(0, 8);
+      const idB = String(teamB.id).slice(0, 8);
+      const externalGameId = `sim-${short}-${idA}-${idB}`;
+
+      const statInserts = [];
+      for (const { player, points } of statsA) {
+        statInserts.push(
+          playerGameStats.create(player.id, today, teamB.id, points, roundName, externalGameId)
+        );
+      }
+      for (const { player, points } of statsB) {
+        statInserts.push(
+          playerGameStats.create(player.id, today, teamA.id, points, roundName, externalGameId)
+        );
+      }
+      await Promise.all(statInserts);
+    }
+
+    // Update winner wins — use stats count for regular rounds, direct update for First Four
+    if (roundName === 'First Four') {
+      await tournamentTeamModel.updateWins(winnerId, 1);
+    } else {
+      await tournamentTeamModel.updateWinsFromStats(winnerId);
+    }
 
     games.push({
       home: teamA.name,

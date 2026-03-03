@@ -95,7 +95,8 @@ async function getPlayerPrices(contestId, { search, minPrice, maxPrice, seed, so
       `SELECT bp.id AS price_id, bp.price, bp.contest_id,
               p.id AS player_id, p.name, p.position, p.season_ppg, p.season_mpg,
               p.is_eliminated,
-              tt.name AS team_name, tt.seed, tt.region, tt.external_id AS team_external_id
+              tt.name AS team_name, tt.seed, tt.region, tt.external_id AS team_external_id,
+              tt.is_first_four, tt.first_four_partner_id
        FROM best_ball_player_prices bp
        JOIN players p ON p.id = bp.player_id
        JOIN tournament_teams tt ON tt.id = p.team_id
@@ -187,10 +188,17 @@ async function getRoster(entryId) {
   const result = await pool.query(
     `SELECT rp.id, rp.player_id, rp.purchase_price, rp.created_at,
             p.name, p.position, p.season_ppg, p.season_mpg, p.is_eliminated,
-            tt.name AS team_name, tt.seed, tt.region, tt.external_id AS team_external_id
+            tt.name AS team_name, tt.seed, tt.region, tt.external_id AS team_external_id,
+            rp.paired_player_id,
+            pp.name AS paired_player_name, pp.position AS paired_player_position,
+            pp.is_eliminated AS paired_is_eliminated,
+            ptt.name AS paired_team_name, ptt.seed AS paired_team_seed,
+            ptt.external_id AS paired_team_external_id
      FROM best_ball_roster_players rp
      JOIN players p ON p.id = rp.player_id
      JOIN tournament_teams tt ON tt.id = p.team_id
+     LEFT JOIN players pp ON pp.id = rp.paired_player_id
+     LEFT JOIN tournament_teams ptt ON ptt.id = pp.team_id
      WHERE rp.entry_id = $1
      ORDER BY rp.purchase_price DESC`,
     [entryId]

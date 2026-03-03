@@ -75,10 +75,10 @@ router.delete('/entries/:entryId', async (req, res) => {
 
 router.post('/entries/:entryId/players', async (req, res) => {
   try {
-    const { playerId } = req.body;
+    const { playerId, pairedPlayerId } = req.body;
     if (!playerId) return res.status(400).json({ error: 'playerId is required' });
 
-    const updated = await bestBallService.addPlayer(req.params.entryId, playerId);
+    const updated = await bestBallService.addPlayer(req.params.entryId, playerId, pairedPlayerId || null);
     res.json(updated);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });

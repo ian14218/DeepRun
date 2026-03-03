@@ -55,8 +55,22 @@ const POSITIONS = computePositions();
 // ── Data builders ──────────────────────────────────────────────
 
 function buildRegionRounds(teams) {
+  // For First Four: multiple teams can share a seed. Use the FF winner as primary.
   const bySeed = {};
-  teams.forEach((t) => { bySeed[t.seed] = t; });
+  teams.forEach((t) => {
+    if (!bySeed[t.seed]) {
+      bySeed[t.seed] = t;
+    } else if (t.is_first_four && bySeed[t.seed].is_first_four) {
+      const existing = bySeed[t.seed];
+      // Both are First Four — pick the winner (more wins) as the primary slot holder.
+      // Before FF is played both have 0 wins, so order doesn't matter.
+      if (t.wins > existing.wins || (!t.is_eliminated && existing.is_eliminated)) {
+        bySeed[t.seed] = { ...t, _ffPartner: existing };
+      } else {
+        bySeed[t.seed] = { ...existing, _ffPartner: t };
+      }
+    }
+  });
 
   const r64 = SEED_MATCHUPS.flatMap(([a, b]) => [bySeed[a] || null, bySeed[b] || null]);
   const rounds = [r64];
@@ -124,6 +138,9 @@ function TeamSlot({ team, draftedCount }) {
   const eliminated = team.is_eliminated;
   const colors = hasDrafted ? getDraftStyle(draftedCount) : null;
 
+  // First Four: show both team names before play-in resolves
+  const hasFFPartner = team._ffPartner && !team._ffPartner.is_eliminated && !team.is_eliminated;
+
   return (
     <div className={cn(
       'flex items-center gap-1.5 border rounded px-2 text-xs h-full w-full transition-colors',
@@ -139,8 +156,17 @@ function TeamSlot({ team, draftedCount }) {
       </span>
       <TeamLogo externalId={team.external_id} teamName={team.name} size={16} />
       <span className={cn('truncate font-medium', eliminated && 'line-through')}>
-        {team.name}
+        {hasFFPartner ? (
+          <>{team.name} <span className="text-muted-foreground font-normal">/</span> {team._ffPartner.name}</>
+        ) : (
+          team.name
+        )}
       </span>
+      {hasFFPartner && (
+        <Badge variant="secondary" className="text-[9px] px-1 py-0 shrink-0 bg-amber-500/15 text-amber-600 border-amber-500/30">
+          FF
+        </Badge>
+      )}
       {hasDrafted && (
         <Badge className={cn('ml-auto text-[10px] px-1 py-0 h-4 shrink-0 text-white', colors.badge)}>
           {draftedCount}
@@ -332,6 +358,77 @@ function CenterColumn({ ff, champ, champion, draftedCountByTeam }) {
   );
 }
 
+// ── First Four Play-In Section ─────────────────────────────────
+
+function FirstFourSection({ teams, draftedCountByTeam }) {
+  // Collect FF pairs: group teams with is_first_four by region+seed
+  const pairMap = {};
+  teams.forEach((t) => {
+    if (!t.is_first_four) return;
+    const key = `${t.region}-${t.seed}`;
+    if (!pairMap[key]) pairMap[key] = [];
+    pairMap[key].push(t);
+  });
+
+  const pairs = Object.values(pairMap).filter((p) => p.length === 2);
+  if (pairs.length === 0) return null;
+
+  return (
+    <div className="mb-4 px-4">
+      <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+        First Four Play-In Games
+      </h3>
+      <div className="flex flex-wrap gap-3">
+        {pairs.map((pair) => {
+          const [a, b] = pair;
+          const aElim = a.is_eliminated;
+          const bElim = b.is_eliminated;
+          const resolved = aElim || bElim;
+          return (
+            <div
+              key={`${a.id}-${b.id}`}
+              className="flex items-center gap-1 border rounded-lg p-2 bg-card text-xs"
+            >
+              <span className="text-muted-foreground font-mono text-[11px] mr-1">
+                {a.seed}
+              </span>
+              <div className="flex flex-col gap-0.5">
+                <div className={cn(
+                  'flex items-center gap-1.5 px-1.5 py-0.5 rounded',
+                  resolved && !aElim && 'bg-accent/10 font-semibold',
+                  aElim && 'opacity-40 line-through',
+                )}>
+                  <TeamLogo externalId={a.external_id} teamName={a.name} size={14} />
+                  <span className="truncate max-w-[120px]">{a.name}</span>
+                  {draftedCountByTeam[a.external_id] > 0 && (
+                    <Badge className={cn('text-[9px] px-1 py-0 h-3.5 text-white', getDraftStyle(draftedCountByTeam[a.external_id]).badge)}>
+                      {draftedCountByTeam[a.external_id]}
+                    </Badge>
+                  )}
+                </div>
+                <div className={cn(
+                  'flex items-center gap-1.5 px-1.5 py-0.5 rounded',
+                  resolved && !bElim && 'bg-accent/10 font-semibold',
+                  bElim && 'opacity-40 line-through',
+                )}>
+                  <TeamLogo externalId={b.external_id} teamName={b.name} size={14} />
+                  <span className="truncate max-w-[120px]">{b.name}</span>
+                  {draftedCountByTeam[b.external_id] > 0 && (
+                    <Badge className={cn('text-[9px] px-1 py-0 h-3.5 text-white', getDraftStyle(draftedCountByTeam[b.external_id]).badge)}>
+                      {draftedCountByTeam[b.external_id]}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <span className="text-muted-foreground/60 text-[10px] ml-1">{a.region}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Main bracket layout ────────────────────────────────────────
 
 export default function BracketView({ teams, draftedCountByTeam = {} }) {
@@ -354,6 +451,7 @@ export default function BracketView({ teams, draftedCountByTeam = {} }) {
 
   return (
     <ScrollArea className="w-full">
+      <FirstFourSection teams={teams} draftedCountByTeam={draftedCountByTeam} />
       <div className="flex items-start p-4" style={{ minWidth: totalW }}>
         {/* Left half: East (top) + West (bottom), progressing L → R */}
         <div className="shrink-0 flex flex-col" style={{ gap: REGION_GAP }}>

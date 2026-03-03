@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import TeamLogo from './TeamLogo';
+import FirstFourPairDialog from './FirstFourPairDialog';
 
 export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
   const [players, setPlayers] = useState([]);
@@ -15,6 +16,7 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
   const [teamFilter, setTeamFilter] = useState('');
   const [sortBy, setSortBy] = useState('ppg');
   const [loading, setLoading] = useState(true);
+  const [ffDialogPlayer, setFfDialogPlayer] = useState(null);
 
   useEffect(() => {
     getAvailablePlayers()
@@ -44,6 +46,19 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
       return (b.season_ppg || 0) - (a.season_ppg || 0);
     });
 
+  function handlePickClick(player) {
+    if (player.is_first_four) {
+      setFfDialogPlayer(player);
+    } else {
+      onPick(player.id);
+    }
+  }
+
+  function handleFfConfirm(primaryId, pairedId) {
+    onPick(primaryId, pairedId);
+    setFfDialogPlayer(null);
+  }
+
   if (loading) {
     return (
       <Card>
@@ -60,82 +75,98 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
   }
 
   return (
-    <Card className="flex flex-col h-[450px] lg:h-full">
-      <CardHeader className="pb-3 space-y-3 shrink-0">
-        <CardTitle className="text-base">Available Players</CardTitle>
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search players..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8"
-          />
-        </div>
-        <div className="flex gap-2">
-          <select
-            value={teamFilter}
-            onChange={(e) => setTeamFilter(e.target.value)}
-            className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-          >
-            <option value="">All teams</option>
-            {teams.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="w-24 h-9 rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-          >
-            <option value="ppg">By PPG</option>
-            <option value="seed">By Seed</option>
-          </select>
-        </div>
-      </CardHeader>
-      <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">
-        <ScrollArea className="h-full">
-          <div className="divide-y divide-border">
-            {visible.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between px-3 py-2 hover:bg-secondary/50 transition-colors gap-2"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-medium truncate">{p.name}</span>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
-                      {p.position}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                    <TeamLogo externalId={p.team_external_id} teamName={p.team_name} size={14} />
-                    <span className="truncate">{p.team_name}</span>
-                    <span className="shrink-0">#{p.seed}</span>
-                    {p.season_ppg > 0 && (
-                      <span className="shrink-0">{p.season_ppg} PPG</span>
-                    )}
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  variant={canPick ? 'default' : 'ghost'}
-                  disabled={!canPick}
-                  onClick={() => onPick(p.id)}
-                  className="shrink-0 h-7 text-xs px-2"
-                >
-                  Pick
-                </Button>
-              </div>
-            ))}
-            {visible.length === 0 && (
-              <div className="px-3 py-8 text-center text-sm text-muted-foreground">
-                No players found.
-              </div>
-            )}
+    <>
+      <Card className="flex flex-col h-[450px] lg:h-full min-w-0 overflow-hidden">
+        <CardHeader className="pb-3 space-y-3 shrink-0 overflow-hidden">
+          <CardTitle className="text-base">Available Players</CardTitle>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search players..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8"
+            />
           </div>
-        </ScrollArea>
-      </CardContent>
-    </Card>
+          <div className="flex gap-2 min-w-0">
+            <select
+              value={teamFilter}
+              onChange={(e) => setTeamFilter(e.target.value)}
+              className="min-w-0 flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              <option value="">All teams</option>
+              {teams.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="shrink-0 w-24 h-9 rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              <option value="ppg">By PPG</option>
+              <option value="seed">By Seed</option>
+            </select>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="h-full">
+            <div className="divide-y divide-border">
+              {visible.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between px-3 py-2 hover:bg-secondary/50 transition-colors gap-2"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-medium truncate">{p.name}</span>
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                        {p.position}
+                      </Badge>
+                      {p.is_first_four && (
+                        <Badge variant="secondary" className="text-[10px] px-1 py-0 shrink-0 bg-amber-500/15 text-amber-600 border-amber-500/30">
+                          FF
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                      <TeamLogo externalId={p.team_external_id} teamName={p.team_name} size={14} />
+                      <span className="truncate">{p.team_name}</span>
+                      <span className="shrink-0">#{p.seed}</span>
+                      {p.season_ppg > 0 && (
+                        <span className="shrink-0">{p.season_ppg} PPG</span>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={canPick ? 'default' : 'ghost'}
+                    disabled={!canPick}
+                    onClick={() => handlePickClick(p)}
+                    className="shrink-0 h-7 text-xs px-2"
+                  >
+                    Pick
+                  </Button>
+                </div>
+              ))}
+              {visible.length === 0 && (
+                <div className="px-3 py-8 text-center text-sm text-muted-foreground">
+                  No players found.
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+
+      <FirstFourPairDialog
+        open={!!ffDialogPlayer}
+        onOpenChange={(open) => !open && setFfDialogPlayer(null)}
+        primaryPlayer={ffDialogPlayer}
+        onConfirm={handleFfConfirm}
+        mode="draft"
+        pickedPlayerIds={pickedPlayerIds}
+      />
+    </>
   );
 }

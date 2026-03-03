@@ -10,9 +10,16 @@ export async function startDraft(leagueId) {
   return res.data;
 }
 
-export async function makePick(leagueId, playerId) {
-  const res = await api.post(`/api/leagues/${leagueId}/draft/pick`, { player_id: playerId });
+export async function makePick(leagueId, playerId, pairedPlayerId = null) {
+  const body = { player_id: playerId };
+  if (pairedPlayerId) body.paired_player_id = pairedPlayerId;
+  const res = await api.post(`/api/leagues/${leagueId}/draft/pick`, body);
   return res.data;
+}
+
+export async function getFirstFourPartnerPlayers(teamId) {
+  const res = await api.get(`/api/players/first-four-partners/${teamId}`);
+  return res.data; // { players, partnerTeam }
 }
 
 export async function controlDraftTimer(leagueId, action, seconds) {

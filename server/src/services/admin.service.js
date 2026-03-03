@@ -122,9 +122,7 @@ async function resetDraft(leagueId) {
 
 async function getTournamentTeams() {
   const result = await pool.query(
-    `SELECT id, name, seed, region, is_eliminated, eliminated_in_round, wins, external_id
-     FROM tournament_teams
-     ORDER BY region, seed ASC`
+    `SELECT * FROM tournament_teams ORDER BY region, seed ASC`
   );
   return result.rows;
 }
@@ -184,10 +182,42 @@ async function resetSimulation({ includeDrafts = false } = {}) {
     `UPDATE players SET is_eliminated = false WHERE is_eliminated = true`
   );
 
+  // Reset Best Ball contests back to open and zero out scores
+  const contests = await pool.query(
+    `UPDATE best_ball_contests SET status = 'open', updated_at = NOW()
+     WHERE status IN ('live', 'locked', 'completed') RETURNING id`
+  );
+  const entries = await pool.query(
+    `UPDATE best_ball_entries SET total_score = 0 WHERE total_score != 0`
+  );
+
+  // Restore First Four pairs from bracket structure (teams sharing seed+region)
+  const ffRestored = await pool.query(
+    `WITH pairs AS (
+       SELECT t1.id AS id_a, t2.id AS id_b
+       FROM tournament_teams t1
+       JOIN tournament_teams t2
+         ON t1.region = t2.region AND t1.seed = t2.seed AND t1.id < t2.id
+     )
+     UPDATE tournament_teams t
+     SET is_first_four = true,
+         first_four_partner_id = CASE
+           WHEN t.id = pairs.id_a THEN pairs.id_b
+           WHEN t.id = pairs.id_b THEN pairs.id_a
+         END
+     FROM pairs
+     WHERE t.id IN (pairs.id_a, pairs.id_b)
+       AND (t.is_first_four = false OR t.first_four_partner_id IS NULL)
+     RETURNING t.id`
+  );
+
   const result = {
     deletedStats: stats.rowCount,
     resetTeams: teams.rowCount,
     resetPlayers: players.rowCount,
+    resetContests: contests.rowCount,
+    resetEntries: entries.rowCount,
+    restoredFirstFourTeams: ffRestored.rowCount,
   };
 
   if (includeDrafts) {
