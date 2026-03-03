@@ -35,6 +35,7 @@ cd client && npm run lint   # ESLint
 # Database
 npm run seed --workspace=server       # Import tournament data
 npm run simulate --workspace=server   # Simulate tournament games
+node database/seed_first_four.js      # Seed First Four team players from ESPN
 ```
 
 ## Database Setup
@@ -43,7 +44,7 @@ Requires PostgreSQL. Create databases `mmfantasy` and `mmfantasy_test`, run migr
 
 ### Migrations
 
-Numbered SQL files in `database/migrations/` (001 through 007). Run sequentially with `psql -U postgres -d mmfantasy -f database/migrations/NNN_name.sql`. When adding schema changes, create the next numbered file (008+). All tables use UUID primary keys (`uuid_generate_v4()`). Current migrations: initial schema, is_bot, season stats, is_admin, draft timer, draft messages, best ball (5 tables + config seed data).
+Numbered SQL files in `database/migrations/` (001 through 008). Run sequentially with `psql -U postgres -d mmfantasy -f database/migrations/NNN_name.sql`. When adding schema changes, create the next numbered file (009+). All tables use UUID primary keys (`uuid_generate_v4()`). Current migrations: initial schema, is_bot, season stats, is_admin, draft timer, draft messages, best ball (5 tables + config seed data), First Four support.
 
 ### Testing Conventions
 
@@ -71,7 +72,7 @@ Layered MVC: **routes → services → models → pg**
 - `services/` — Axios-based API layer; `api.js` has JWT interceptor that attaches token to all requests
 - `components/ui/` — Radix UI primitives (button, card, dialog, etc.)
 - `components/layout/` — AppLayout, LeagueLayout (sidebar), AdminLayout
-- `components/` — Feature components (DraftBoard, PlayerList, StandingsTable, BracketView, TeamLogo)
+- `components/` — Feature components (DraftBoard, PlayerList, StandingsTable, BracketView, TeamLogo, FirstFourPairDialog)
 - `components/bestball/` — Best Ball UI components (PlayerMarket, RosterPanel, BudgetBar, PriceTag)
 - `pages/` — Route pages; `pages/admin/` for admin dashboard
 - `pages/BestBall*.jsx` — Best Ball hub, roster builder, leaderboard, and entry detail pages
@@ -90,7 +91,9 @@ Layered MVC: **routes → services → models → pg**
 
 **Best Ball** (`server/src/services/bestBall.service.js`, `bestBallPricing.service.js`): Salary-cap contest with transactional roster management using `FOR UPDATE` row locks. Pricing uses a 5-step pipeline (minutes weight → weighted PPG → seed multiplier → normalization → convex curve). Config stored in `best_ball_config` table. Auto-provisions a contest when tournament data exists. Contest lifecycle: upcoming → open → live → completed (auto-transitions to `live` on first simulation). Scores updated via `updateScores()` after stat sync and simulation.
 
-**Simulation** (`server/src/services/simulation.service.js`): Simulates tournament rounds with bracket-aware matchups. Generates random `player_game_stats`, eliminates losing teams, and auto-updates Best Ball scores. Used via admin UI or CLI (`npm run simulate`).
+**First Four** (migration 008, `tournamentTeam.model.js`): The NCAA tournament starts with 68 teams — 4 play-in games (the "First Four") reduce to 64 before the Round of 64. Schema: `tournament_teams.is_first_four` (boolean) and `tournament_teams.first_four_partner_id` (FK to partner team, bidirectional). First Four pairs are identified by two teams sharing the same seed+region. Admin UI (`AdminTournament.jsx`, First Four tab) manages pairs via `setFirstFourPartner()`/`clearFirstFourPair()`. When drafting a First Four player, `PlayerList` detects `is_first_four=true` and opens `FirstFourPairDialog`, which calls `/api/players/first-four-partners/:teamId` to load partner-team players. The pick is stored with `draft_picks.paired_player_id`. Best Ball uses the same pattern via `best_ball_roster_players.paired_player_id`. Simulation round 0 matches First Four pairs; losers are eliminated before the Round of 64. First Four games do not generate `player_game_stats` (no scoring impact). The `resetSimulation()` function auto-restores First Four pairs from bracket structure (teams sharing seed+region) so pairs survive any reset.
+
+**Simulation** (`server/src/services/simulation.service.js`): Simulates tournament rounds with bracket-aware matchups. Round 0 = First Four, rounds 1-6 = R64 through Championship. Generates random `player_game_stats` (except First Four), eliminates losing teams, and auto-updates Best Ball scores. Used via admin UI or CLI (`npm run simulate`). `resetSimulation()` in `admin.service.js` clears all game stats, resets team/player elimination and wins, resets Best Ball contests, and restores First Four pairs. With `includeDrafts=true`, also clears draft picks and resets leagues to pre_draft.
 
 ### API Routes
 
@@ -101,8 +104,9 @@ All routes are mounted under `/api/` in `app.js`:
 - `/api/leagues/:id/draft` — start draft, make picks, get draft state
 - `/api/players` — search/filter players (paginated)
 - `/api/leagues/:id/standings` — leaderboard, team rosters, scoreboard
-- `/api/admin` — system stats, user/league management, tournament simulation (requires admin middleware)
+- `/api/admin` — system stats, user/league management, tournament simulation, First Four pair management (requires admin middleware)
 - `/api/best-ball` — Best Ball contest, entries, roster management, player market, leaderboard, admin endpoints
+- `/api/players/first-four-partners/:teamId` — returns players on the partner First Four team for pair selection
 - `/api/tournaments` — tournament teams and bracket data
 - `/api/chat` — draft room chat messages
 
