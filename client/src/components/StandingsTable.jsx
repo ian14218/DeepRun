@@ -44,9 +44,9 @@ export default function StandingsTable({ standings, leagueId }) {
                 <TableHead className="w-12 text-center">#</TableHead>
                 <TableHead>Team</TableHead>
                 <TableHead className="text-right">Points</TableHead>
-                <TableHead className="text-right">Active</TableHead>
-                <TableHead className="text-right">Eliminated</TableHead>
-                <TableHead className="text-right">Remaining</TableHead>
+                <TableHead className="text-right hidden sm:table-cell">Active</TableHead>
+                <TableHead className="text-right hidden sm:table-cell">Eliminated</TableHead>
+                <TableHead className="text-right hidden sm:table-cell">Remaining</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -69,15 +69,20 @@ export default function StandingsTable({ standings, leagueId }) {
                       {i + 1}
                     </TableCell>
                     <TableCell className="font-medium">
-                      {row.team_name || row.username}
-                      {isCurrentUser && (
-                        <span className="ml-1.5 text-xs text-primary">(You)</span>
-                      )}
+                      <div>
+                        {row.team_name || row.username}
+                        {isCurrentUser && (
+                          <span className="ml-1.5 text-xs text-primary">(You)</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground sm:hidden">
+                        {row.active_players} active · {row.eliminated_players} elim
+                      </p>
                     </TableCell>
                     <TableCell className="text-right font-semibold">{row.total_score}</TableCell>
-                    <TableCell className="text-right text-success">{row.active_players}</TableCell>
-                    <TableCell className="text-right text-destructive">{row.eliminated_players}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{row.players_remaining}</TableCell>
+                    <TableCell className="text-right text-success hidden sm:table-cell">{row.active_players}</TableCell>
+                    <TableCell className="text-right text-destructive hidden sm:table-cell">{row.eliminated_players}</TableCell>
+                    <TableCell className="text-right text-muted-foreground hidden sm:table-cell">{row.players_remaining}</TableCell>
                   </TableRow>
                 );
               })}

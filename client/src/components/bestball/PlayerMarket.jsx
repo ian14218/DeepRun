@@ -119,15 +119,66 @@ export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd
         </div>
       </div>
 
-      {/* Table */}
-      <div className="border rounded-lg overflow-hidden">
+      {/* Mobile card list */}
+      <div className="sm:hidden space-y-2">
+        {loading ? (
+          <p className="text-center py-8 text-muted-foreground">Loading...</p>
+        ) : players.length === 0 ? (
+          <p className="text-center py-8 text-muted-foreground">No players found</p>
+        ) : (
+          players.map((player) => {
+            const isRostered = rosteredIds.has(player.player_id);
+            const tooExpensive = player.price > budgetRemaining;
+
+            return (
+              <div
+                key={player.player_id}
+                className={`flex items-center gap-3 p-3 border rounded-lg ${isRostered ? 'opacity-50' : ''}`}
+              >
+                <TeamLogo externalId={player.team_external_id} teamName={player.team_name} size={24} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">
+                    {player.name}
+                    {player.is_first_four && (
+                      <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0 bg-amber-500/15 text-amber-600 border-amber-500/30">
+                        FF
+                      </Badge>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {player.team_name} · {player.seed}-seed
+                    {player.season_ppg ? <span className="font-semibold text-foreground"> · {parseFloat(player.season_ppg).toFixed(1)} PPG</span> : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <PriceTag price={player.price} />
+                  {!readOnly && (
+                    <Button
+                      size="sm"
+                      variant={isRostered ? 'outline' : 'default'}
+                      disabled={isRostered || tooExpensive}
+                      onClick={() => handleAddClick(player)}
+                      className="h-8 px-3"
+                    >
+                      {isRostered ? 'Added' : 'Add'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="border rounded-lg overflow-hidden hidden sm:block">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Player</TableHead>
-              <TableHead className="hidden sm:table-cell">Team</TableHead>
+              <TableHead>Team</TableHead>
               <TableHead className="text-center">Seed</TableHead>
-              <TableHead className="text-center hidden sm:table-cell">PPG</TableHead>
+              <TableHead className="text-center">PPG</TableHead>
               <TableHead className="text-right">Price</TableHead>
               {!readOnly && <TableHead className="w-20"></TableHead>}
             </TableRow>
@@ -155,24 +206,21 @@ export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <TeamLogo externalId={player.team_external_id} teamName={player.team_name} size={18} />
-                        <div>
-                          <p className="font-medium">
-                            {player.name}
-                            {player.is_first_four && (
-                              <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0 bg-amber-500/15 text-amber-600 border-amber-500/30">
-                                FF
-                              </Badge>
-                            )}
-                          </p>
-                          <p className="text-xs text-muted-foreground sm:hidden">{player.team_name}</p>
-                        </div>
+                        <p className="font-medium">
+                          {player.name}
+                          {player.is_first_four && (
+                            <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0 bg-amber-500/15 text-amber-600 border-amber-500/30">
+                              FF
+                            </Badge>
+                          )}
+                        </p>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell text-muted-foreground">
+                    <TableCell className="text-muted-foreground">
                       {player.team_name}
                     </TableCell>
                     <TableCell className="text-center">{player.seed}</TableCell>
-                    <TableCell className="text-center hidden sm:table-cell">
+                    <TableCell className="text-center">
                       {player.season_ppg ? parseFloat(player.season_ppg).toFixed(1) : '—'}
                     </TableCell>
                     <TableCell className="text-right">
@@ -235,6 +283,7 @@ export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd
         onConfirm={handleFfConfirm}
         mode="bestball"
         pickedPlayerIds={[...rosteredIds]}
+        contestId={contestId}
       />
     </div>
   );

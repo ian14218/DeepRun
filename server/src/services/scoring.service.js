@@ -87,11 +87,13 @@ async function getTeamRoster(leagueId, memberId) {
        dp.pick_number,
        p.id AS player_id, p.name, p.position, p.jersey_number, p.is_eliminated,
        tt.name AS team_name, tt.seed, tt.region, tt.external_id AS team_external_id,
+       tt.eliminated_in_round AS team_eliminated_in_round,
        dp.paired_player_id,
        pp.name AS paired_player_name, pp.position AS paired_player_position,
        pp.is_eliminated AS paired_is_eliminated,
        ptt.name AS paired_team_name, ptt.seed AS paired_team_seed,
        ptt.external_id AS paired_team_external_id,
+       ptt.eliminated_in_round AS paired_team_eliminated_in_round,
        COALESCE(SUM(pgs.points), 0)::int AS total_points
      FROM draft_picks dp
      JOIN players p ON p.id = dp.player_id
@@ -102,9 +104,9 @@ async function getTeamRoster(leagueId, memberId) {
      WHERE dp.member_id = $1 AND dp.league_id = $2
      GROUP BY dp.pick_number, dp.paired_player_id,
               p.id, p.name, p.position, p.jersey_number, p.is_eliminated,
-              tt.name, tt.seed, tt.region, tt.external_id,
+              tt.name, tt.seed, tt.region, tt.external_id, tt.eliminated_in_round,
               pp.name, pp.position, pp.is_eliminated,
-              ptt.name, ptt.seed, ptt.external_id
+              ptt.name, ptt.seed, ptt.external_id, ptt.eliminated_in_round
      ORDER BY p.is_eliminated ASC, dp.pick_number ASC`,
     [memberId, leagueId]
   );
@@ -126,11 +128,60 @@ async function getTeamRoster(leagueId, memberId) {
     roundMap[row.player_id][row.tournament_round] = row.points;
   }
 
-  return playersResult.rows.map((p) => ({
-    ...p,
-    points_by_round: roundMap[p.player_id] || {},
-    paired_points_by_round: p.paired_player_id ? (roundMap[p.paired_player_id] || {}) : {},
-  }));
+  return playersResult.rows.map((p) => {
+    const primaryRounds = roundMap[p.player_id] || {};
+    const pairedRounds = p.paired_player_id ? (roundMap[p.paired_player_id] || {}) : {};
+
+    if (!p.paired_player_id) {
+      return { ...p, points_by_round: primaryRounds, paired_points_by_round: {} };
+    }
+
+    // For First Four pairs: the player whose team was eliminated in "First Four"
+    // is the FF loser. Show the FF winner as the display player and only count their points.
+    const primaryLostFF = p.team_eliminated_in_round === 'First Four';
+    const pairedLostFF = p.paired_team_eliminated_in_round === 'First Four';
+
+    // Determine who advanced: the one who did NOT lose in FF
+    // If neither lost in FF yet (FF hasn't been played), show primary as-is
+    const shouldSwap = primaryLostFF && !pairedLostFF;
+
+    // Only count the advancing player's points (FF loser has 0 stats anyway,
+    // but be explicit — don't include their rounds)
+    const winnerRounds = shouldSwap ? pairedRounds : primaryRounds;
+
+    // Recalculate total from only the winner's rounds
+    const winnerTotal = Object.values(winnerRounds).reduce((a, b) => a + b, 0);
+
+    if (shouldSwap) {
+      return {
+        ...p,
+        total_points: winnerTotal,
+        player_id: p.paired_player_id,
+        name: p.paired_player_name,
+        position: p.paired_player_position,
+        is_eliminated: p.paired_is_eliminated,
+        team_name: p.paired_team_name,
+        team_external_id: p.paired_team_external_id,
+        seed: p.paired_team_seed,
+        paired_player_id: p.player_id,
+        paired_player_name: p.name,
+        paired_player_position: p.position,
+        paired_is_eliminated: p.is_eliminated,
+        paired_team_name: p.team_name,
+        paired_team_external_id: p.team_external_id,
+        paired_team_seed: p.seed,
+        points_by_round: pairedRounds,
+        paired_points_by_round: {},
+      };
+    }
+
+    return {
+      ...p,
+      total_points: winnerTotal,
+      points_by_round: primaryRounds,
+      paired_points_by_round: {},
+    };
+  });
 }
 
 module.exports = {

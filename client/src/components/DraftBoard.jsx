@@ -79,11 +79,12 @@ export default function DraftBoard({
                     <TableHead
                       key={pos}
                       className={cn(
-                        'text-xs text-center min-w-[90px]',
+                        'text-xs text-center min-w-[70px] sm:min-w-[90px]',
                         isMe && 'text-primary font-bold'
                       )}
                     >
-                      {member?.team_name || member?.username || `Team ${pos}`}
+                      <span className="sm:hidden truncate block">{member?.username?.slice(0, 6) || `T${pos}`}</span>
+                      <span className="hidden sm:block">{member?.team_name || member?.username || `Team ${pos}`}</span>
                     </TableHead>
                   );
                 })}

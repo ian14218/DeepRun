@@ -37,19 +37,19 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Your Leagues</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold">Your Leagues</h1>
         <div className="flex gap-2">
-          <Button asChild>
+          <Button size="sm" asChild className="sm:size-default">
             <Link to="/leagues/create">
-              <Plus className="h-4 w-4 mr-1.5" />
-              Create League
+              <Plus className="h-4 w-4 sm:mr-1.5" />
+              <span>Create</span>
             </Link>
           </Button>
-          <Button variant="outline" asChild>
+          <Button size="sm" variant="outline" asChild className="sm:size-default">
             <Link to="/leagues/join">
-              <UserPlus className="h-4 w-4 mr-1.5" />
-              Join League
+              <UserPlus className="h-4 w-4 sm:mr-1.5" />
+              <span>Join</span>
             </Link>
           </Button>
         </div>
@@ -58,7 +58,7 @@ export default function Dashboard() {
       {/* Best Ball section */}
       <Link to="/best-ball">
         <Card className="mb-8 hover:border-emerald-500/40 transition-colors border-emerald-500/20 bg-gradient-to-r from-emerald-500/5 to-transparent">
-          <CardContent className="p-5 flex items-center gap-4">
+          <CardContent className="p-4 sm:p-5 flex items-center gap-3 sm:gap-4">
             <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
               <DollarSign className="h-5 w-5 text-emerald-400" />
             </div>

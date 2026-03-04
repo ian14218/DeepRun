@@ -62,11 +62,11 @@ export default function Scoreboard() {
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-6">
         <Link to={`/leagues/${leagueId}`} className="text-primary hover:underline text-sm">
           ← Back to League
         </Link>
-        <h1 className="text-3xl font-bold">Scoreboard</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold">Scoreboard</h1>
       </div>
 
       {error && <p className="text-destructive mb-4">{error}</p>}

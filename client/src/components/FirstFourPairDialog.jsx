@@ -21,6 +21,7 @@ export default function FirstFourPairDialog({
   onConfirm,
   mode = 'draft', // 'draft' or 'bestball'
   pickedPlayerIds = [],
+  contestId = null,
 }) {
   const [partnerPlayers, setPartnerPlayers] = useState([]);
   const [partnerTeam, setPartnerTeam] = useState(null);
@@ -35,7 +36,7 @@ export default function FirstFourPairDialog({
     setSelectedPairedId(null);
     setLoading(true);
     const picked = JSON.parse(pickedKey);
-    getFirstFourPartnerPlayers(primaryPlayer.team_id)
+    getFirstFourPartnerPlayers(primaryPlayer.team_id, mode === 'bestball' ? contestId : null)
       .then((data) => {
         const available = data.players
           .filter((p) => !picked.includes(p.id))
@@ -45,7 +46,7 @@ export default function FirstFourPairDialog({
       })
       .catch(() => { setPartnerPlayers([]); setPartnerTeam(null); })
       .finally(() => setLoading(false));
-  }, [open, primaryPlayer?.team_id, pickedKey]);
+  }, [open, primaryPlayer?.team_id, pickedKey, mode, contestId]);
 
   const handleConfirm = () => {
     if (!selectedPairedId) return;

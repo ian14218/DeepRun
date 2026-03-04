@@ -127,8 +127,14 @@ export default function BestBall() {
 
   // ─── Live / Locked / Completed view ──────────────────────────────────────
   if (isLive && entry && entryDetail) {
-    const activeCount = entryDetail.roster?.filter((p) => !p.is_eliminated).length || 0;
-    const elimCount = entryDetail.roster?.filter((p) => p.is_eliminated).length || 0;
+    const activeCount = entryDetail.roster?.filter((p) => {
+      if (p.paired_player_name) return !p.is_eliminated || !p.paired_is_eliminated;
+      return !p.is_eliminated;
+    }).length || 0;
+    const elimCount = entryDetail.roster?.filter((p) => {
+      if (p.paired_player_name) return p.is_eliminated && p.paired_is_eliminated;
+      return p.is_eliminated;
+    }).length || 0;
 
     // Build draftedCountByTeam for bracket highlighting
     const draftedCountByTeam = {};
@@ -239,33 +245,77 @@ export default function BestBall() {
                     <div
                       key={player.player_id}
                       className={`flex items-center justify-between p-2.5 rounded border ${
-                        player.is_eliminated
+                        player.is_eliminated && (!player.paired_player_name || player.paired_is_eliminated)
                           ? 'border-red-500/20 bg-red-500/5 opacity-60'
                           : 'border-border bg-card'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <TeamLogo externalId={player.team_external_id} teamName={player.team_name} size={22} />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {player.name}
-                            {player.is_eliminated && (
-                              <span className="text-xs text-red-400 ml-1.5">ELIM</span>
+                      {player.paired_player_name ? (() => {
+                        const primaryOut = player.is_eliminated;
+                        const pairedOut = player.paired_is_eliminated;
+                        const showPaired = primaryOut && !pairedOut;
+                        const activeName = showPaired ? player.paired_player_name : player.name;
+                        const activeTeamName = showPaired ? player.paired_team_name : player.team_name;
+                        const activeTeamExtId = showPaired ? player.paired_team_external_id : player.team_external_id;
+                        const settled = primaryOut || pairedOut;
+                        const bothOut = primaryOut && pairedOut;
+
+                        return (
+                          <>
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <TeamLogo externalId={activeTeamExtId} teamName={activeTeamName} size={22} />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  {activeName}
+                                  {bothOut && <span className="text-xs text-red-400 ml-1.5">ELIM</span>}
+                                </p>
+                                {settled ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    {activeTeamName} · {player.seed}-seed · <PriceTag price={player.purchase_price} className="text-xs inline" />
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">
+                                    {player.name} vs {player.paired_player_name} · <span className="text-amber-600">First Four</span> · <PriceTag price={player.purchase_price} className="text-xs inline" />
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right ml-2 shrink-0">
+                              <p className="text-sm font-bold">{player.total_points} pts</p>
+                              {player.round_points?.length > 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                  {player.round_points.map((rp) => rp.points).join(' + ')}
+                                </p>
+                              )}
+                            </div>
+                          </>
+                        );
+                      })() : (
+                        <>
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <TeamLogo externalId={player.team_external_id} teamName={player.team_name} size={22} />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                {player.name}
+                                {player.is_eliminated && (
+                                  <span className="text-xs text-red-400 ml-1.5">ELIM</span>
+                                )}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {player.team_name} · {player.seed}-seed · <PriceTag price={player.purchase_price} className="text-xs inline" />
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right ml-2 shrink-0">
+                            <p className="text-sm font-bold">{player.total_points} pts</p>
+                            {player.round_points?.length > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                {player.round_points.map((rp) => rp.points).join(' + ')}
+                              </p>
                             )}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {player.team_name} · {player.seed}-seed · <PriceTag price={player.purchase_price} className="text-xs inline" />
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right ml-2 shrink-0">
-                        <p className="text-sm font-bold">{player.total_points} pts</p>
-                        {player.round_points?.length > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            {player.round_points.map((rp) => rp.points).join(' + ')}
-                          </p>
-                        )}
-                      </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
               </CardContent>

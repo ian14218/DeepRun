@@ -32,37 +32,51 @@ export default function RosterPanel({ entry, roster, rosterSize, totalBudget, on
             {player ? (
               <>
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <TeamLogo externalId={player.team_external_id} teamName={player.team_name} size={20} />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {player.name}
-                      {player.paired_player_name && (
-                        <span className="text-muted-foreground font-normal text-xs">
-                          {' '}/ {player.paired_player_name}
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {player.team_name} · {player.seed}-seed
-                      {player.paired_player_name && (
-                        <span className="ml-1 text-amber-600">(First Four)</span>
-                      )}
-                    </p>
-                    {player.paired_player_name && (
-                      <p className="text-xs text-muted-foreground">
-                        {player.is_eliminated ? (
-                          <Badge variant="destructive" className="text-[10px] px-1 py-0 mr-1">Out</Badge>
-                        ) : (
-                          <Badge variant="default" className="text-[10px] px-1 py-0 mr-1">Active</Badge>
-                        )}
-                        {player.paired_is_eliminated ? (
-                          <Badge variant="destructive" className="text-[10px] px-1 py-0">Out</Badge>
-                        ) : (
-                          <Badge variant="default" className="text-[10px] px-1 py-0">Active</Badge>
-                        )}
-                      </p>
-                    )}
-                  </div>
+                  {player.paired_player_name ? (() => {
+                    // First Four pair: show the advancing player, or both if neither eliminated yet
+                    const primaryOut = player.is_eliminated;
+                    const pairedOut = player.paired_is_eliminated;
+                    const showPaired = primaryOut && !pairedOut;
+                    const activeName = showPaired ? player.paired_player_name : player.name;
+                    const activeTeamName = showPaired ? player.paired_team_name : player.team_name;
+                    const activeTeamExtId = showPaired ? player.paired_team_external_id : player.team_external_id;
+                    const settled = primaryOut || pairedOut;
+
+                    return (
+                      <>
+                        <TeamLogo externalId={activeTeamExtId} teamName={activeTeamName} size={20} />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{activeName}</p>
+                          {settled ? (
+                            <p className="text-xs text-muted-foreground">
+                              {activeTeamName} · {player.seed}-seed
+                            </p>
+                          ) : (
+                            <>
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <TeamLogo externalId={player.team_external_id} teamName={player.team_name} size={12} />
+                                {player.name}
+                                <span className="text-amber-600">vs</span>
+                                <TeamLogo externalId={player.paired_team_external_id} teamName={player.paired_team_name} size={12} />
+                                {player.paired_player_name}
+                              </p>
+                              <p className="text-xs text-amber-600">(First Four)</p>
+                            </>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })() : (
+                    <>
+                      <TeamLogo externalId={player.team_external_id} teamName={player.team_name} size={20} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{player.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {player.team_name} · {player.seed}-seed
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 ml-2">
                   <PriceTag price={player.purchase_price} className="text-sm" />

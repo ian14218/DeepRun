@@ -2,6 +2,7 @@ const express = require('express');
 const playerService = require('../services/player.service');
 const tournamentTeamModel = require('../models/tournamentTeam.model');
 const playerModel = require('../models/player.model');
+const pool = require('../db');
 
 const router = express.Router();
 
@@ -40,7 +41,24 @@ router.get('/players/first-four-partners/:teamId', async (req, res) => {
       return res.status(400).json({ error: 'Team is not a First Four team' });
     }
     const partnerTeam = await tournamentTeamModel.findById(team.first_four_partner_id);
-    const players = await playerModel.findByTeamId(team.first_four_partner_id);
+    let players = await playerModel.findByTeamId(team.first_four_partner_id);
+
+    // If contestId is provided, attach Best Ball prices
+    const { contestId } = req.query;
+    if (contestId) {
+      const playerIds = players.map((p) => p.id);
+      const priceResult = await pool.query(
+        `SELECT player_id, price FROM best_ball_player_prices
+         WHERE contest_id = $1 AND player_id = ANY($2)`,
+        [contestId, playerIds]
+      );
+      const priceMap = {};
+      for (const row of priceResult.rows) {
+        priceMap[row.player_id] = row.price;
+      }
+      players = players.map((p) => ({ ...p, price: priceMap[p.id] ?? null }));
+    }
+
     return res.json({ players, partnerTeam: { name: partnerTeam.name, external_id: partnerTeam.external_id, seed: partnerTeam.seed, region: partnerTeam.region } });
   } catch (err) {
     return res.status(500).json({ error: err.message });

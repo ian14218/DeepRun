@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Users, Trophy, Swords } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, Swords, DollarSign } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 const NAV_ITEMS = [
@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { to: '/admin/users', icon: Users, label: 'Users' },
   { to: '/admin/leagues', icon: Trophy, label: 'Leagues' },
   { to: '/admin/tournament', icon: Swords, label: 'Tournament' },
+  { to: '/admin/best-ball', icon: DollarSign, label: 'Best Ball' },
 ];
 
 export default function AdminLayout() {

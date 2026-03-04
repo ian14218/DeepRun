@@ -62,9 +62,9 @@ CREATE TABLE IF NOT EXISTS best_ball_config (
 
 -- Seed default config rows
 INSERT INTO best_ball_config (key, value, description) VALUES
-  ('salary_floor', '500', 'Minimum player price'),
-  ('salary_ceiling', '1800', 'Maximum player price'),
-  ('curve_exponent', '0.7', 'Price distribution shape (lower = more convex)'),
+  ('salary_floor', '100', 'Minimum player price'),
+  ('salary_ceiling', '2200', 'Maximum player price'),
+  ('curve_exponent', '1.2', 'Price distribution shape (higher = more spread between tiers)'),
   ('price_rounding', '50', 'Round prices to nearest N'),
   ('minutes_baseline', '30', 'MPG denominator for minutes weight'),
   ('minutes_floor', '0.15', 'Minimum minutes weight'),

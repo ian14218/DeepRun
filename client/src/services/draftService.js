@@ -17,8 +17,9 @@ export async function makePick(leagueId, playerId, pairedPlayerId = null) {
   return res.data;
 }
 
-export async function getFirstFourPartnerPlayers(teamId) {
-  const res = await api.get(`/api/players/first-four-partners/${teamId}`);
+export async function getFirstFourPartnerPlayers(teamId, contestId = null) {
+  const params = contestId ? { contestId } : {};
+  const res = await api.get(`/api/players/first-four-partners/${teamId}`, { params });
   return res.data; // { players, partnerTeam }
 }
 

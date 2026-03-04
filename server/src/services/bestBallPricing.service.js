@@ -30,9 +30,9 @@ function getProjectedValue(ppg, mpg, seed, config) {
 function calculatePlayerPrice(ppg, mpg, seed, config, normalization) {
   const projectedValue = getProjectedValue(ppg, mpg, seed, config);
 
-  const floor = config.salaryFloor || 500;
-  const ceiling = config.salaryCeiling || 1800;
-  const exponent = config.curveExponent || 0.7;
+  const floor = config.salaryFloor || 100;
+  const ceiling = config.salaryCeiling || 2200;
+  const exponent = config.curveExponent || 1.2;
   const rounding = config.priceRounding || 50;
 
   // Step 4: normalize
@@ -55,9 +55,9 @@ async function loadConfig() {
     raw[row.key] = row.value;
   }
   return {
-    salaryFloor: parseInt(raw.salary_floor, 10) || 500,
-    salaryCeiling: parseInt(raw.salary_ceiling, 10) || 1800,
-    curveExponent: parseFloat(raw.curve_exponent) || 0.7,
+    salaryFloor: parseInt(raw.salary_floor, 10) || 100,
+    salaryCeiling: parseInt(raw.salary_ceiling, 10) || 2200,
+    curveExponent: parseFloat(raw.curve_exponent) || 1.2,
     priceRounding: parseInt(raw.price_rounding, 10) || 50,
     minutesBaseline: parseInt(raw.minutes_baseline, 10) || 30,
     minutesFloor: parseFloat(raw.minutes_floor) || 0.15,

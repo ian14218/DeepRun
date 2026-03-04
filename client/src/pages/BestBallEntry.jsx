@@ -133,33 +133,53 @@ export default function BestBallEntry() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {entry.roster?.map((player) => (
-              <TableRow key={player.player_id}>
-                <TableCell>
-                  <div>
-                    <p className="font-medium">{player.name}</p>
-                    <p className="text-xs text-muted-foreground sm:hidden">{player.team_name}</p>
-                  </div>
-                </TableCell>
-                <TableCell className="hidden sm:table-cell text-muted-foreground">
-                  {player.team_name}
-                </TableCell>
-                <TableCell className="text-center">{player.seed}</TableCell>
-                <TableCell className="text-right">
-                  <PriceTag price={player.purchase_price} />
-                </TableCell>
-                <TableCell className="text-center font-mono font-semibold">
-                  {player.total_points}
-                </TableCell>
-                <TableCell className="text-center">
-                  {player.is_eliminated ? (
-                    <Badge variant="outline" className="text-red-400 border-red-500/30">Out</Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-emerald-400 border-emerald-500/30">Active</Badge>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
+            {entry.roster?.map((player) => {
+              const hasPair = !!player.paired_player_name;
+              const primaryOut = player.is_eliminated;
+              const pairedOut = player.paired_is_eliminated;
+              const showPaired = hasPair && primaryOut && !pairedOut;
+              const settled = hasPair && (primaryOut || pairedOut);
+              const bothOut = hasPair && primaryOut && pairedOut;
+              const activeName = showPaired ? player.paired_player_name : player.name;
+              const activeTeamName = showPaired ? player.paired_team_name : player.team_name;
+              const isElim = hasPair ? bothOut : player.is_eliminated;
+
+              return (
+                <TableRow key={player.player_id}>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">
+                        {activeName}
+                        {hasPair && !settled && (
+                          <span className="text-xs text-muted-foreground font-normal"> / {player.paired_player_name}</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground sm:hidden">{activeTeamName}</p>
+                      {hasPair && !settled && (
+                        <p className="text-xs text-amber-600">First Four</p>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell text-muted-foreground">
+                    {activeTeamName}
+                  </TableCell>
+                  <TableCell className="text-center">{player.seed}</TableCell>
+                  <TableCell className="text-right">
+                    <PriceTag price={player.purchase_price} />
+                  </TableCell>
+                  <TableCell className="text-center font-mono font-semibold">
+                    {player.total_points}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {isElim ? (
+                      <Badge variant="outline" className="text-red-400 border-red-500/30">Out</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-emerald-400 border-emerald-500/30">Active</Badge>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

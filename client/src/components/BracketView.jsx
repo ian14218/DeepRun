@@ -112,6 +112,16 @@ function buildFinalRounds(regionRounds) {
 
 // ── Rendering components ───────────────────────────────────────
 
+// Short team name for FF pairs in tight bracket slots
+function shortName(name) {
+  if (!name) return '?';
+  const words = name.split(/\s+/);
+  if (words.length === 1) return name.slice(0, 6);
+  // For multi-word: use first word if short, otherwise initials
+  if (words[0].length <= 6) return words[0];
+  return words.map(w => w[0]).join('').toUpperCase();
+}
+
 // Border + background colors keyed by drafted player count
 const DRAFT_COLORS = {
   1: { border: 'border-blue-500',    borderDim: 'border-blue-500/40',    bg: 'bg-blue-500/10',   bgDim: 'bg-blue-500/5',   badge: 'bg-blue-500' },
@@ -155,18 +165,16 @@ function TeamSlot({ team, draftedCount }) {
         {team.seed}
       </span>
       <TeamLogo externalId={team.external_id} teamName={team.name} size={16} />
+      {hasFFPartner && (
+        <TeamLogo externalId={team._ffPartner.external_id} teamName={team._ffPartner.name} size={16} className="-ml-1" />
+      )}
       <span className={cn('truncate font-medium', eliminated && 'line-through')}>
         {hasFFPartner ? (
-          <>{team.name} <span className="text-muted-foreground font-normal">/</span> {team._ffPartner.name}</>
+          <>{shortName(team.name)}<span className="text-muted-foreground font-normal">/</span>{shortName(team._ffPartner.name)}</>
         ) : (
           team.name
         )}
       </span>
-      {hasFFPartner && (
-        <Badge variant="secondary" className="text-[9px] px-1 py-0 shrink-0 bg-amber-500/15 text-amber-600 border-amber-500/30">
-          FF
-        </Badge>
-      )}
       {hasDrafted && (
         <Badge className={cn('ml-auto text-[10px] px-1 py-0 h-4 shrink-0 text-white', colors.badge)}>
           {draftedCount}

@@ -139,7 +139,7 @@ export default function AdminTournament() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-6">Tournament Management</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6">Tournament Management</h1>
 
       <Tabs defaultValue="teams">
         <TabsList className="mb-4">
@@ -151,7 +151,7 @@ export default function AdminTournament() {
         <TabsContent value="teams">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <CardTitle className="text-lg">Tournament Teams ({teams.length})</CardTitle>
                 <div className="flex gap-2">
                   <Button onClick={handleSimulateRound} disabled={simulating} size="sm">
@@ -162,7 +162,7 @@ export default function AdminTournament() {
                     size="sm"
                     onClick={() => setResetOpen(true)}
                   >
-                    Reset Simulation
+                    Reset
                   </Button>
                 </div>
               </div>

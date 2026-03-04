@@ -6,8 +6,10 @@ import { getTeamRoster } from '../services/standingsService';
 import PlayerRow from '../components/PlayerRow';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { List, TableProperties } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -33,6 +35,7 @@ export default function TeamRoster() {
   const [isCurrentUser, setIsCurrentUser] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showRounds, setShowRounds] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -74,11 +77,11 @@ export default function TeamRoster() {
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-4">
         <Link to={`/leagues/${leagueId}`} className="text-primary hover:underline text-sm">
           ← Back to League
         </Link>
-        <h1 className="text-3xl font-bold">
+        <h1 className="text-2xl sm:text-3xl font-bold">
           {isCurrentUser ? 'My Team' : `Team: ${memberName}`}
           {isCurrentUser && (
             <span className="ml-2 text-sm font-normal text-primary">(You)</span>
@@ -97,6 +100,15 @@ export default function TeamRoster() {
             style={{ width: total > 0 ? `${(active.length / total) * 100}%` : '0%' }}
           />
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="md:hidden shrink-0"
+          onClick={() => setShowRounds((v) => !v)}
+        >
+          {showRounds ? <List className="h-4 w-4 mr-1.5" /> : <TableProperties className="h-4 w-4 mr-1.5" />}
+          {showRounds ? 'Summary' : 'By Round'}
+        </Button>
       </div>
 
       {roster.length === 0 ? (
@@ -113,11 +125,11 @@ export default function TeamRoster() {
                 <TableHeader>
                   <TableRow className="border-border">
                     <TableHead>Player</TableHead>
-                    <TableHead>College Team</TableHead>
-                    <TableHead>Pos</TableHead>
+                    <TableHead className="hidden sm:table-cell">College Team</TableHead>
+                    <TableHead className="hidden sm:table-cell">Pos</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     {ROUNDS.map((r) => (
-                      <TableHead key={r} className="text-right text-xs">
+                      <TableHead key={r} className={`text-right text-xs ${showRounds ? '' : 'hidden md:table-cell'}`}>
                         {r}
                       </TableHead>
                     ))}
@@ -125,7 +137,7 @@ export default function TeamRoster() {
                 </TableHeader>
                 <TableBody>
                   {roster.map((player) => (
-                    <PlayerRow key={player.player_id} player={player} />
+                    <PlayerRow key={player.player_id} player={player} showRounds={showRounds} />
                   ))}
                 </TableBody>
               </Table>

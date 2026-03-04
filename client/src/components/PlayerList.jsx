@@ -134,7 +134,7 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
                       <span className="truncate">{p.team_name}</span>
                       <span className="shrink-0">#{p.seed}</span>
                       {p.season_ppg > 0 && (
-                        <span className="shrink-0">{p.season_ppg} PPG</span>
+                        <span className="shrink-0 font-semibold text-foreground">{p.season_ppg} PPG</span>
                       )}
                     </div>
                   </div>

@@ -229,7 +229,7 @@ export default function LeagueDetail() {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-3xl font-bold">{league.name}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold">{league.name}</h1>
             <Badge variant={status.variant}>{status.label}</Badge>
             {isCommissioner && league.draft_status === 'pre_draft' && (
               <Button variant="ghost" size="icon" onClick={openEditDialog} className="h-7 w-7">
@@ -334,16 +334,16 @@ export default function LeagueDetail() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {/* Your Rank */}
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="rounded-md bg-primary/10 p-1.5">
+                  <div className="rounded-md bg-primary/10 p-1.5 shrink-0">
                     <Crown className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Rank</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">Your Rank</p>
                 </div>
-                <p className="text-2xl font-bold">
+                <p className="text-xl sm:text-2xl font-bold">
                   #{myRank}
-                  <span className="text-sm font-normal text-muted-foreground ml-1">
+                  <span className="text-xs sm:text-sm font-normal text-muted-foreground ml-1">
                     of {standings.length}
                   </span>
                 </p>
@@ -352,14 +352,14 @@ export default function LeagueDetail() {
 
             {/* Your Points */}
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="rounded-md bg-primary/10 p-1.5">
+                  <div className="rounded-md bg-primary/10 p-1.5 shrink-0">
                     <TrendingUp className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Points</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">Points</p>
                 </div>
-                <p className="text-2xl font-bold">{myRow.total_score}</p>
+                <p className="text-xl sm:text-2xl font-bold">{myRow.total_score}</p>
                 {leader && leader.user_id !== user?.id && (
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {myRow.total_score - leader.total_score} from 1st
@@ -370,16 +370,16 @@ export default function LeagueDetail() {
 
             {/* Players Alive */}
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="rounded-md bg-success/10 p-1.5">
+                  <div className="rounded-md bg-success/10 p-1.5 shrink-0">
                     <Heart className="h-4 w-4 text-success" />
                   </div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Players Alive</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">Players Alive</p>
                 </div>
-                <p className="text-2xl font-bold">
+                <p className="text-xl sm:text-2xl font-bold">
                   {playersAlive}
-                  <span className="text-sm font-normal text-muted-foreground ml-1">
+                  <span className="text-xs sm:text-sm font-normal text-muted-foreground ml-1">
                     of {playersTotal}
                   </span>
                 </p>
@@ -396,16 +396,16 @@ export default function LeagueDetail() {
 
             {/* Top Scorer */}
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="rounded-md bg-yellow-500/10 p-1.5">
+                  <div className="rounded-md bg-yellow-500/10 p-1.5 shrink-0">
                     <Target className="h-4 w-4 text-yellow-500" />
                   </div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Top Scorer</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">Top Scorer</p>
                 </div>
                 {topPerformer ? (
                   <>
-                    <p className="text-lg font-bold truncate">{topPerformer.name}</p>
+                    <p className="text-base sm:text-lg font-bold truncate">{topPerformer.name}</p>
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                       <TeamLogo externalId={topPerformer.team_external_id} teamName={topPerformer.team_name} size={14} />
                       {topPerformer.total_points} pts
@@ -552,11 +552,11 @@ export default function LeagueDetail() {
                   <TableHeader>
                     <TableRow className="border-border">
                       <TableHead>Player</TableHead>
-                      <TableHead>College Team</TableHead>
-                      <TableHead>Pos</TableHead>
+                      <TableHead className="hidden sm:table-cell">College Team</TableHead>
+                      <TableHead className="hidden sm:table-cell">Pos</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                       {ROUNDS.map((r) => (
-                        <TableHead key={r} className="text-right text-xs">
+                        <TableHead key={r} className="text-right text-xs hidden md:table-cell">
                           {r}
                         </TableHead>
                       ))}
