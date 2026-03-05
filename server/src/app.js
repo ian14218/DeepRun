@@ -20,6 +20,11 @@ const pool = require('./db');
 
 const app = express();
 
+// Trust proxy when behind Railway/reverse proxy (needed for rate limiting + correct client IP)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Security headers (CSP disabled — Vite build uses inline scripts)
 app.use(helmet({ contentSecurityPolicy: false }));
 
