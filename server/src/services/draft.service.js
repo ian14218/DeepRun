@@ -117,13 +117,13 @@ async function autoPickOnTimeout(leagueId, io) {
   const onTheClock = members.find((m) => m.draft_position === currentPos);
   if (!onTheClock) return;
 
-  // Pick a random available player (exclude both primary and paired IDs)
+  // Pick a random available non-eliminated player (exclude both primary and paired IDs)
   const draftedPlayerIds = picks.flatMap((p) => [p.player_id, p.paired_player_id].filter(Boolean));
   const availableResult = await pool.query(
-    `SELECT p.id, tt.is_first_four, tt.first_four_partner_id
+    `SELECT p.id, tt.is_first_four, tt.first_four_partner_id, tt.is_eliminated AS team_eliminated
      FROM players p
      JOIN tournament_teams tt ON tt.id = p.team_id
-     WHERE p.id != ALL($1::uuid[])
+     WHERE p.id != ALL($1::uuid[]) AND p.is_eliminated = false
      ORDER BY RANDOM() LIMIT 1`,
     [draftedPlayerIds]
   );
@@ -131,14 +131,18 @@ async function autoPickOnTimeout(leagueId, io) {
 
   const chosen = availableResult.rows[0];
   let pairedPlayerId = null;
-  if (chosen.is_first_four) {
-    const partnerResult = await pool.query(
-      `SELECT p.id FROM players p
-       WHERE p.team_id = $1 AND p.id != ALL($2::uuid[])
-       ORDER BY RANDOM() LIMIT 1`,
-      [chosen.first_four_partner_id, draftedPlayerIds]
-    );
-    pairedPlayerId = partnerResult.rows[0]?.id || null;
+  // Only pair if First Four and partner team is still alive
+  if (chosen.is_first_four && chosen.first_four_partner_id) {
+    const partnerTeam = await tournamentTeamModel.findById(chosen.first_four_partner_id);
+    if (partnerTeam && !partnerTeam.is_eliminated) {
+      const partnerResult = await pool.query(
+        `SELECT p.id FROM players p
+         WHERE p.team_id = $1 AND p.id != ALL($2::uuid[]) AND p.is_eliminated = false
+         ORDER BY RANDOM() LIMIT 1`,
+        [chosen.first_four_partner_id, draftedPlayerIds]
+      );
+      pairedPlayerId = partnerResult.rows[0]?.id || null;
+    }
   }
 
   const playerId = chosen.id;
@@ -248,7 +252,8 @@ async function startDraft(leagueId, userId) {
   return { draft_status: 'in_progress', draft_order, draft_timer_seconds: league.draft_timer_seconds ?? 90 };
 }
 
-async function makePick(leagueId, userId, playerId, pairedPlayerId = null) {
+async function makePick(leagueId, userId, playerId, inputPairedPlayerId = null) {
+  let pairedPlayerId = inputPairedPlayerId;
   // Read members outside the transaction (league_members don't change during a pick)
   const members = await leagueModel.findMembersByLeague(leagueId);
 
@@ -256,8 +261,19 @@ async function makePick(leagueId, userId, playerId, pairedPlayerId = null) {
   const player = await playerModel.findById(playerId);
   if (!player) { const e = new Error('Player not found'); e.status = 404; throw e; }
 
+  // Block picking eliminated players
+  if (player.is_eliminated) {
+    const e = new Error('Cannot draft an eliminated player'); e.status = 400; throw e;
+  }
+
   const team = await tournamentTeamModel.findById(player.team_id);
-  if (team && team.is_first_four) {
+
+  // First Four pairing: only required if the partner team is still alive
+  const partnerAlive = team && team.is_first_four && team.first_four_partner_id
+    ? !(await tournamentTeamModel.findById(team.first_four_partner_id)).is_eliminated
+    : false;
+
+  if (team && team.is_first_four && partnerAlive) {
     if (!pairedPlayerId) {
       const e = new Error('First Four player requires a paired player from the partner team'); e.status = 400; throw e;
     }
@@ -266,8 +282,17 @@ async function makePick(leagueId, userId, playerId, pairedPlayerId = null) {
     if (pairedPlayer.team_id !== team.first_four_partner_id) {
       const e = new Error('Paired player must be from the First Four partner team'); e.status = 400; throw e;
     }
-  } else if (pairedPlayerId) {
+    if (pairedPlayer.is_eliminated) {
+      const e = new Error('Cannot draft an eliminated paired player'); e.status = 400; throw e;
+    }
+  } else if (pairedPlayerId && !(team && team.is_first_four && !partnerAlive)) {
+    // Allow (but ignore) pairedPlayerId if partner was eliminated — otherwise reject
     const e = new Error('Cannot pair a player who is not in the First Four'); e.status = 400; throw e;
+  }
+
+  // If partner is eliminated, clear the pairedPlayerId (no longer relevant)
+  if (team && team.is_first_four && !partnerAlive) {
+    pairedPlayerId = null;
   }
 
   const client = await pool.connect();
@@ -430,13 +455,13 @@ async function autoPick(leagueId, io) {
     const onTheClock = members.find((m) => m.draft_position === currentPos);
     if (!onTheClock || !onTheClock.is_bot) break; // human's turn — stop
 
-    // Pick a random available player (exclude both primary and paired IDs)
+    // Pick a random available non-eliminated player (exclude both primary and paired IDs)
     const draftedPlayerIds = picks.flatMap((p) => [p.player_id, p.paired_player_id].filter(Boolean));
     const availableResult = await pool.query(
       `SELECT p.id, tt.is_first_four, tt.first_four_partner_id
        FROM players p
        JOIN tournament_teams tt ON tt.id = p.team_id
-       WHERE p.id != ALL($1::uuid[])
+       WHERE p.id != ALL($1::uuid[]) AND p.is_eliminated = false
        ORDER BY RANDOM() LIMIT 1`,
       [draftedPlayerIds]
     );
@@ -445,14 +470,18 @@ async function autoPick(leagueId, io) {
 
     const chosen = availableResult.rows[0];
     let pairedPlayerId = null;
-    if (chosen.is_first_four) {
-      const partnerResult = await pool.query(
-        `SELECT p.id FROM players p
-         WHERE p.team_id = $1 AND p.id != ALL($2::uuid[])
-         ORDER BY RANDOM() LIMIT 1`,
-        [chosen.first_four_partner_id, draftedPlayerIds]
-      );
-      pairedPlayerId = partnerResult.rows[0]?.id || null;
+    // Only pair if First Four and partner team is still alive
+    if (chosen.is_first_four && chosen.first_four_partner_id) {
+      const partnerTeam = await tournamentTeamModel.findById(chosen.first_four_partner_id);
+      if (partnerTeam && !partnerTeam.is_eliminated) {
+        const partnerResult = await pool.query(
+          `SELECT p.id FROM players p
+           WHERE p.team_id = $1 AND p.id != ALL($2::uuid[]) AND p.is_eliminated = false
+           ORDER BY RANDOM() LIMIT 1`,
+          [chosen.first_four_partner_id, draftedPlayerIds]
+        );
+        pairedPlayerId = partnerResult.rows[0]?.id || null;
+      }
     }
 
     const playerId = chosen.id;

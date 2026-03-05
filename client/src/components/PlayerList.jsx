@@ -30,6 +30,7 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
   const visible = players
     .filter((p) => {
       if (pickedPlayerIds.includes(p.id)) return false;
+      if (p.is_eliminated || p.team_is_eliminated) return false;
       if ((p.season_ppg || 0) < 3) return false;
       if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
       if (teamFilter && p.team_name !== teamFilter) return false;

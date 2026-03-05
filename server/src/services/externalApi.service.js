@@ -47,22 +47,26 @@ const ESPN_BASE =
 
 // ─── Round label mapping (ESPN uses ordinal slugs) ────────────────────────────
 
-const ESPN_ROUND_LABELS = {
-  1: 'Round of 64',
-  2: 'Round of 32',
-  3: 'Sweet 16',
-  4: 'Elite 8',
-  5: 'Final Four',
-  6: 'Championship',
-};
+// Map ESPN note headlines to our round labels
+const ROUND_PATTERNS = [
+  { pattern: /first four/i, label: 'First Four' },
+  { pattern: /1st round/i, label: 'Round of 64' },
+  { pattern: /2nd round/i, label: 'Round of 32' },
+  { pattern: /sweet 16/i, label: 'Sweet 16' },
+  { pattern: /elite 8|elite eight/i, label: 'Elite 8' },
+  { pattern: /final four/i, label: 'Final Four' },
+  { pattern: /championship|national championship/i, label: 'Championship' },
+];
 
 function resolveRound(event) {
-  const round = event.season?.type?.id
-    ? parseInt(event.competitions?.[0]?.format?.regulation?.periods, 10)
-    : null;
-  // ESPN stores playoff round in notes or seasonType; fall back to 'Round of 64'
-  const groupId = event.competitions?.[0]?.groups?.id;
-  return ESPN_ROUND_LABELS[groupId] || 'Round of 64';
+  const notes = event.competitions?.[0]?.notes || [];
+  for (const note of notes) {
+    const headline = note.headline || '';
+    for (const { pattern, label } of ROUND_PATTERNS) {
+      if (pattern.test(headline)) return label;
+    }
+  }
+  return 'Round of 64';
 }
 
 // ─── Transformers ─────────────────────────────────────────────────────────────
@@ -113,7 +117,7 @@ function transformGameSummary(event) {
   };
 }
 
-function transformBoxScore(data, externalGameId) {
+function transformBoxScore(data, externalGameId, fallbackRound) {
   const dateStr = data.header?.competitions?.[0]?.date?.split('T')[0] || new Date().toISOString().split('T')[0];
 
   const teams = (data.boxscore?.players || []).map((teamEntry) => {
@@ -123,7 +127,7 @@ function transformBoxScore(data, externalGameId) {
     for (const statGroup of teamEntry.statistics || []) {
       for (const athlete of statGroup.athletes || []) {
         const stats = athlete.stats || [];
-        // ESPN: stats array order is PTS last in most formats; find by label
+        // ESPN: stats array order varies; find PTS by label
         const labels = statGroup.labels || [];
         const ptsIdx = labels.indexOf('PTS');
         const ptsStr = ptsIdx >= 0 ? stats[ptsIdx] : '0';
@@ -139,8 +143,8 @@ function transformBoxScore(data, externalGameId) {
     return { external_team_id: externalTeamId, players };
   });
 
-  const tournamentRound =
-    data.header?.competitions?.[0]?.notes?.[0]?.headline || 'Round of 64';
+  // Box score header doesn't include notes/round — use the fallback from the scoreboard
+  const tournamentRound = fallbackRound || 'Round of 64';
 
   return {
     external_game_id: externalGameId,
@@ -160,11 +164,23 @@ async function fetchTodaysGames() {
   return events.map(transformGameSummary);
 }
 
-async function fetchGameBoxScore(externalGameId) {
+/**
+ * Fetch games for a specific date (YYYYMMDD format).
+ * Used for backfilling missed days.
+ */
+async function fetchGamesByDate(dateStr) {
+  const resp = await axios.get(`${ESPN_BASE}/scoreboard`, {
+    params: { groups: 100, dates: dateStr },
+  });
+  const events = resp.data.events || [];
+  return events.map(transformGameSummary);
+}
+
+async function fetchGameBoxScore(externalGameId, tournamentRound) {
   const resp = await axios.get(`${ESPN_BASE}/summary`, {
     params: { event: externalGameId },
   });
-  return transformBoxScore(resp.data, externalGameId);
+  return transformBoxScore(resp.data, externalGameId, tournamentRound);
 }
 
 async function fetchTournamentTeams() {
@@ -193,6 +209,7 @@ async function fetchTeamRoster(externalTeamId) {
 
 module.exports = {
   fetchTodaysGames,
+  fetchGamesByDate,
   fetchGameBoxScore,
   fetchTournamentTeams,
   fetchTeamRoster,

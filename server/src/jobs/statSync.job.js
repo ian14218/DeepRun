@@ -47,7 +47,7 @@ async function runSyncJob() {
 }
 
 async function processGame(game) {
-  const boxScore = await externalApi.fetchGameBoxScore(game.external_game_id);
+  const boxScore = await externalApi.fetchGameBoxScore(game.external_game_id, game.tournament_round);
 
   // Build a map of external_team_id → internal team record so we can resolve
   // opponent_team_id for each player's stat entry.
@@ -99,15 +99,54 @@ async function processGame(game) {
     }
   }
 
-  // Update Best Ball scores after processing all games
+  // Auto-transition Best Ball contest to 'live' when the first non-First-Four
+  // game is processed (Round of 64+). First Four play-in games should NOT lock
+  // rosters — users can still draft and build rosters during the First Four.
   try {
     const activeContest = await bestBallModel.getActiveContest();
-    if (activeContest && ['live', 'locked'].includes(activeContest.status)) {
-      await bestBallService.updateScores(activeContest.id);
+    if (activeContest) {
+      if (activeContest.status === 'open' && game.status !== 'upcoming') {
+        const teamsInGame = Object.values(teamRecords);
+        const isFirstFourGame = teamsInGame.length === 2 && teamsInGame.every(t => t.is_first_four);
+        if (!isFirstFourGame) {
+          console.log('[statSync] First tournament game detected — locking Best Ball contest');
+          await bestBallModel.updateContestStatus(activeContest.id, 'live');
+        }
+      }
+      if (['open', 'live', 'locked'].includes(activeContest.status)) {
+        await bestBallService.updateScores(activeContest.id);
+      }
     }
   } catch (err) {
     console.error('[statSync] Failed to update Best Ball scores:', err.message);
   }
 }
 
-module.exports = { runSyncJob };
+/**
+ * Backfill sync for a specific date (YYYYMMDD string).
+ * Fetches all games for that date and processes them.
+ */
+async function runSyncForDate(dateStr) {
+  let games;
+  try {
+    games = await externalApi.fetchGamesByDate(dateStr);
+  } catch (err) {
+    console.error(`[statSync] Failed to fetch games for ${dateStr}:`, err.message);
+    return { date: dateStr, gamesProcessed: 0, error: err.message };
+  }
+
+  let processed = 0;
+  for (const game of games) {
+    if (game.status === 'upcoming') continue;
+    try {
+      await processGame(game);
+      processed++;
+    } catch (err) {
+      console.error(`[statSync] Error processing game ${game.external_game_id} on ${dateStr}:`, err.message);
+    }
+  }
+
+  return { date: dateStr, gamesFound: games.length, gamesProcessed: processed };
+}
+
+module.exports = { runSyncJob, runSyncForDate };

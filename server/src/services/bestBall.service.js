@@ -52,22 +52,39 @@ async function createEntry(contestId, userId) {
   return bestBallModel.createEntry(contestId, userId, contest.budget);
 }
 
-async function addPlayer(entryId, playerId, pairedPlayerId = null) {
-  // Validate First Four pairing before entering transaction
-  const playerTeamResult = await pool.query(
-    `SELECT tt.is_first_four, tt.first_four_partner_id
+async function addPlayer(entryId, playerId, inputPairedPlayerId = null) {
+  let pairedPlayerId = inputPairedPlayerId;
+
+  // Block adding eliminated players
+  const playerCheck = await pool.query(
+    `SELECT p.is_eliminated, tt.is_first_four, tt.first_four_partner_id, tt.is_eliminated AS team_eliminated
      FROM players p JOIN tournament_teams tt ON tt.id = p.team_id WHERE p.id = $1`,
     [playerId]
   );
-  const playerTeam = playerTeamResult.rows[0];
-  if (playerTeam && playerTeam.is_first_four) {
+  const playerInfo = playerCheck.rows[0];
+  if (!playerInfo) throw createError('Player not found', 404);
+  if (playerInfo.is_eliminated) throw createError('Cannot add an eliminated player', 400);
+
+  // First Four pairing: only required if the partner team is still alive
+  const partnerAlive = playerInfo.is_first_four && playerInfo.first_four_partner_id
+    ? await pool.query('SELECT is_eliminated FROM tournament_teams WHERE id = $1', [playerInfo.first_four_partner_id])
+        .then(r => r.rows[0] && !r.rows[0].is_eliminated)
+    : false;
+
+  if (playerInfo.is_first_four && partnerAlive) {
     if (!pairedPlayerId) throw createError('First Four player requires a paired player from the partner team', 400);
-    const pairedTeamResult = await pool.query('SELECT team_id FROM players WHERE id = $1', [pairedPlayerId]);
-    if (!pairedTeamResult.rows[0] || pairedTeamResult.rows[0].team_id !== playerTeam.first_four_partner_id) {
+    const pairedCheck = await pool.query('SELECT team_id, is_eliminated FROM players WHERE id = $1', [pairedPlayerId]);
+    if (!pairedCheck.rows[0] || pairedCheck.rows[0].team_id !== playerInfo.first_four_partner_id) {
       throw createError('Paired player must be from the First Four partner team', 400);
     }
-  } else if (pairedPlayerId) {
+    if (pairedCheck.rows[0].is_eliminated) throw createError('Cannot add an eliminated paired player', 400);
+  } else if (pairedPlayerId && !(playerInfo.is_first_four && !partnerAlive)) {
     throw createError('Cannot pair a player who is not in the First Four', 400);
+  }
+
+  // If partner is eliminated, clear pairedPlayerId (First Four resolved)
+  if (playerInfo.is_first_four && !partnerAlive) {
+    pairedPlayerId = null;
   }
 
   const client = await pool.connect();
