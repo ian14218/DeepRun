@@ -119,7 +119,16 @@ router.get('/tournament/players', async (req, res) => {
   }
 });
 
-router.post('/tournament/reset-simulation', async (req, res) => {
+// Simulation endpoints — gated by SIMULATION_ENABLED env var to prevent
+// accidental simulation over real tournament data in production.
+function requireSimulationEnabled(req, res, next) {
+  if (process.env.SIMULATION_ENABLED !== 'true') {
+    return res.status(403).json({ error: 'Simulation is disabled in this environment' });
+  }
+  next();
+}
+
+router.post('/tournament/reset-simulation', requireSimulationEnabled, async (req, res) => {
   try {
     const { includeDrafts } = req.body;
     const result = await adminService.resetSimulation({ includeDrafts: !!includeDrafts });
@@ -129,7 +138,7 @@ router.post('/tournament/reset-simulation', async (req, res) => {
   }
 });
 
-router.post('/tournament/simulate-round', async (req, res) => {
+router.post('/tournament/simulate-round', requireSimulationEnabled, async (req, res) => {
   try {
     const result = await simulationService.simulateRound();
     res.json(result);

@@ -1,6 +1,6 @@
 const request = require('supertest');
 const app = require('../src/app');
-const { runMigrations, truncateTables, closePool } = require('./setup');
+const { runMigrations, truncateTables } = require('./setup');
 const { createTestTeam, createTestPlayer } = require('./factories');
 const { eliminateTeam } = require('../src/services/elimination.service');
 
@@ -12,9 +12,6 @@ afterEach(async () => {
   await truncateTables();
 });
 
-afterAll(async () => {
-  await closePool();
-});
 
 describe('GET /api/tournaments/teams', () => {
   it('returns all tournament teams with seed and region', async () => {

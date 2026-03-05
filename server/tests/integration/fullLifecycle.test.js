@@ -1,6 +1,6 @@
 const request = require('supertest');
 const app = require('../../src/app');
-const { runMigrations, truncateTables, closePool } = require('../setup');
+const { runMigrations, truncateTables } = require('../setup');
 const { createTestTeam, createTestPlayer, createTestGameStat } = require('../factories');
 const { eliminateTeam } = require('../../src/services/elimination.service');
 
@@ -12,9 +12,6 @@ beforeEach(async () => {
   await truncateTables();
 });
 
-afterAll(async () => {
-  await closePool();
-});
 
 describe('Full lifecycle integration', () => {
   /**

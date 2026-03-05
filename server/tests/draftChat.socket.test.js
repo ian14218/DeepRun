@@ -8,7 +8,7 @@ const request = require('supertest');
 const app = require('../src/app');
 const pool = require('../src/db');
 const { initDraftSocket } = require('../src/socket/draftSocket');
-const { runMigrations, truncateTables, closePool } = require('./setup');
+const { runMigrations, truncateTables } = require('./setup');
 const { createTestUser } = require('./factories');
 
 let httpServer, serverAddress;
@@ -30,7 +30,6 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  await closePool();
   await new Promise((resolve) => httpServer.close(resolve));
 });
 
@@ -55,9 +54,9 @@ async function setupLeague() {
   return { users, league };
 }
 
-function connectClient(leagueId) {
+function connectClient(leagueId, token) {
   return new Promise((resolve, reject) => {
-    const socket = ioc(serverAddress, { forceNew: true });
+    const socket = ioc(serverAddress, { forceNew: true, auth: { token } });
     socket.on('connect', () => {
       socket.emit('join-draft', { leagueId });
       resolve(socket);
@@ -70,15 +69,13 @@ describe('Draft chat socket events', () => {
   it('broadcasts draft:message to the league room', async () => {
     const { users, league } = await setupLeague();
 
-    const sender = await connectClient(league.id);
-    const receiver = await connectClient(league.id);
+    const sender = await connectClient(league.id, users[0].token);
+    const receiver = await connectClient(league.id, users[1].token);
 
     const msgPromise = new Promise((resolve) => receiver.on('draft:message', resolve));
 
     sender.emit('draft:message', {
       leagueId: league.id,
-      userId: users[0].user.id,
-      username: users[0].user.username,
       message: 'Hello everyone!',
     });
 
@@ -100,14 +97,12 @@ describe('Draft chat socket events', () => {
   it('persists message to the database', async () => {
     const { users, league } = await setupLeague();
 
-    const socket = await connectClient(league.id);
+    const socket = await connectClient(league.id, users[0].token);
 
     const msgPromise = new Promise((resolve) => socket.on('draft:message', resolve));
 
     socket.emit('draft:message', {
       leagueId: league.id,
-      userId: users[0].user.id,
-      username: users[0].user.username,
       message: 'Saved message',
     });
 
@@ -129,14 +124,12 @@ describe('Draft chat socket events', () => {
   it('strips HTML tags from messages', async () => {
     const { users, league } = await setupLeague();
 
-    const socket = await connectClient(league.id);
+    const socket = await connectClient(league.id, users[0].token);
 
     const msgPromise = new Promise((resolve) => socket.on('draft:message', resolve));
 
     socket.emit('draft:message', {
       leagueId: league.id,
-      userId: users[0].user.id,
-      username: users[0].user.username,
       message: '<script>alert("xss")</script>Nice pick!',
     });
 
@@ -154,15 +147,13 @@ describe('Draft chat socket events', () => {
   it('truncates messages to 500 characters', async () => {
     const { users, league } = await setupLeague();
 
-    const socket = await connectClient(league.id);
+    const socket = await connectClient(league.id, users[0].token);
 
     const msgPromise = new Promise((resolve) => socket.on('draft:message', resolve));
 
     const longMessage = 'A'.repeat(600);
     socket.emit('draft:message', {
       leagueId: league.id,
-      userId: users[0].user.id,
-      username: users[0].user.username,
       message: longMessage,
     });
 
@@ -176,21 +167,19 @@ describe('Draft chat socket events', () => {
     socket.disconnect();
   });
 
-  it('ignores messages with missing required fields', async () => {
-    const { league } = await setupLeague();
+  it('ignores messages with missing leagueId', async () => {
+    const { users, league } = await setupLeague();
 
-    const socket = await connectClient(league.id);
+    const socket = await connectClient(league.id, users[0].token);
 
-    // No userId
+    // No leagueId
     socket.emit('draft:message', {
-      leagueId: league.id,
-      message: 'No user',
+      message: 'No league',
     });
 
     // No message
     socket.emit('draft:message', {
       leagueId: league.id,
-      userId: 'some-id',
     });
 
     // Give time for any potential DB writes
@@ -209,8 +198,8 @@ describe('Draft chat socket events', () => {
     const { users, league } = await setupLeague();
     const { users: users2, league: league2 } = await setupLeague();
 
-    const sender = await connectClient(league.id);
-    const otherRoom = await connectClient(league2.id);
+    const sender = await connectClient(league.id, users[0].token);
+    const otherRoom = await connectClient(league2.id, users2[0].token);
 
     let receivedInOtherRoom = false;
     otherRoom.on('draft:message', () => { receivedInOtherRoom = true; });
@@ -219,8 +208,6 @@ describe('Draft chat socket events', () => {
 
     sender.emit('draft:message', {
       leagueId: league.id,
-      userId: users[0].user.id,
-      username: users[0].user.username,
       message: 'Private to league 1',
     });
 

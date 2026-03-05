@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { getAdminTeams, getAdminPlayers, simulateTournamentRound, resetSimulation, getFirstFourPairs, createFirstFourPair, removeFirstFourPair } from '../../services/adminService';
+import { getAdminStats, getAdminTeams, getAdminPlayers, simulateTournamentRound, resetSimulation, getFirstFourPairs, createFirstFourPair, removeFirstFourPair } from '../../services/adminService';
 import { toast } from 'sonner';
 import TeamLogo from '../../components/TeamLogo';
 
@@ -15,6 +15,7 @@ export default function AdminTournament() {
   const [teams, setTeams] = useState([]);
   const [teamsLoading, setTeamsLoading] = useState(true);
 
+  const [simulationEnabled, setSimulationEnabled] = useState(false);
   const [simulating, setSimulating] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -32,6 +33,9 @@ export default function AdminTournament() {
   const [ffLoading, setFfLoading] = useState(false);
 
   useEffect(() => {
+    getAdminStats()
+      .then((stats) => setSimulationEnabled(!!stats.simulationEnabled))
+      .catch(() => {});
     getAdminTeams()
       .then(setTeams)
       .catch(() => toast.error('Failed to load teams'))
@@ -153,18 +157,20 @@ export default function AdminTournament() {
             <CardHeader>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <CardTitle className="text-lg">Tournament Teams ({teams.length})</CardTitle>
-                <div className="flex gap-2">
-                  <Button onClick={handleSimulateRound} disabled={simulating} size="sm">
-                    {simulating ? 'Simulating...' : 'Simulate Round'}
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setResetOpen(true)}
-                  >
-                    Reset
-                  </Button>
-                </div>
+                {simulationEnabled && (
+                  <div className="flex gap-2">
+                    <Button onClick={handleSimulateRound} disabled={simulating} size="sm">
+                      {simulating ? 'Simulating...' : 'Simulate Round'}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setResetOpen(true)}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent>

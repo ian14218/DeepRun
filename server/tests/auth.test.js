@@ -1,6 +1,6 @@
 const request = require('supertest');
 const app = require('../src/app');
-const { runMigrations, truncateTables, closePool } = require('./setup');
+const { runMigrations, truncateTables } = require('./setup');
 
 beforeAll(async () => {
   await runMigrations();
@@ -10,9 +10,6 @@ afterEach(async () => {
   await truncateTables();
 });
 
-afterAll(async () => {
-  await closePool();
-});
 
 const validUser = {
   username: 'testuser',
@@ -44,6 +41,14 @@ describe('POST /api/auth/register', () => {
       .post('/api/auth/register')
       .send({ email: 'test@example.com' });
     expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when password is shorter than 8 characters', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ username: 'shortpw', email: 'short@example.com', password: 'Ab1!' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/8 characters/);
   });
 });
 

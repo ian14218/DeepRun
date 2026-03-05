@@ -1,4 +1,4 @@
-const { runMigrations, truncateTables, closePool } = require('./setup');
+const { runMigrations, truncateTables } = require('./setup');
 const {
   createTestUser,
   createTestTeam,
@@ -18,9 +18,6 @@ afterEach(async () => {
   await truncateTables();
 });
 
-afterAll(async () => {
-  await closePool();
-});
 
 // ─── calculateTeamScore ───────────────────────────────────────────────────────
 

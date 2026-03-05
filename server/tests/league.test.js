@@ -1,6 +1,6 @@
 const request = require('supertest');
 const app = require('../src/app');
-const { runMigrations, truncateTables, closePool } = require('./setup');
+const { runMigrations, truncateTables } = require('./setup');
 const { createTestUser } = require('./factories');
 
 beforeAll(async () => {
@@ -11,9 +11,6 @@ afterEach(async () => {
   await truncateTables();
 });
 
-afterAll(async () => {
-  await closePool();
-});
 
 // ─── POST /api/leagues ────────────────────────────────────────────────────────
 

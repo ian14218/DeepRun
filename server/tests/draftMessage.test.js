@@ -1,7 +1,7 @@
 const request = require('supertest');
 const app = require('../src/app');
 const pool = require('../src/db');
-const { runMigrations, truncateTables, closePool } = require('./setup');
+const { runMigrations, truncateTables } = require('./setup');
 const { createTestUser, createTestTeam, createTestPlayer } = require('./factories');
 
 beforeAll(async () => {
@@ -12,9 +12,6 @@ afterEach(async () => {
   await truncateTables();
 });
 
-afterAll(async () => {
-  await closePool();
-});
 
 // Helper — create a league and start its draft so chat is available
 async function setupLeague() {

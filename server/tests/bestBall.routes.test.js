@@ -1,6 +1,6 @@
 const request = require('supertest');
 const app = require('../src/app');
-const { runMigrations, truncateTables, closePool } = require('./setup');
+const { runMigrations, truncateTables } = require('./setup');
 const pool = require('../src/db');
 const {
   createTestUser,
@@ -22,9 +22,6 @@ beforeEach(async () => {
   await seedBestBallConfig();
 });
 
-afterAll(async () => {
-  await closePool();
-});
 
 async function createAdminUser() {
   const { user, token } = await createTestUser();

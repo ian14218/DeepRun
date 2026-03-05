@@ -20,6 +20,10 @@ router.post('/register', authLimiter, async (req, res) => {
     return res.status(400).json({ error: 'username, email, and password are required' });
   }
 
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+
   try {
     const user = await authService.register(username, email, password);
     return res.status(201).json(user);

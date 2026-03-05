@@ -28,7 +28,7 @@ const R64_DATES = {
 
 const args = process.argv.slice(2);
 const yearIdx = args.indexOf('--year');
-const year = yearIdx >= 0 ? parseInt(args[yearIdx + 1], 10) : 2025;
+const year = yearIdx >= 0 ? parseInt(args[yearIdx + 1], 10) : 2026;
 const dryRun = args.includes('--dry-run');
 
 function extractRegion(notes) {

@@ -1,4 +1,4 @@
-const { runMigrations, truncateTables, closePool } = require('./setup');
+const { runMigrations, truncateTables } = require('./setup');
 const {
   createTestUser,
   createTestTeam,
@@ -20,9 +20,6 @@ beforeEach(async () => {
   await seedBestBallConfig();
 });
 
-afterAll(async () => {
-  await closePool();
-});
 
 describe('Best Ball Model', () => {
   // ─── Contests ───────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-const { runMigrations, truncateTables, closePool } = require('./setup');
+const { runMigrations, truncateTables } = require('./setup');
 const {
   createTestTeam,
   createTestPlayer,
@@ -36,9 +36,6 @@ beforeEach(async () => {
   await seedBestBallConfig();
 });
 
-afterAll(async () => {
-  await closePool();
-});
 
 describe('getProjectedValue', () => {
   test('full minutes starter on 1-seed', () => {

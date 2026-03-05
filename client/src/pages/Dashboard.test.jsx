@@ -31,8 +31,10 @@ describe('Dashboard', () => {
   it('shows Create League and Join League buttons', async () => {
     leagueService.getLeagues.mockResolvedValue([]);
     renderDashboard();
-    expect(screen.getByRole('link', { name: /create league/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /join league/i })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: /create league/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /join league/i })).toBeInTheDocument();
+    });
   });
 
   it('renders a card for each league with name, member count, and draft status', async () => {

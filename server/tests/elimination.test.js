@@ -1,6 +1,6 @@
 const request = require('supertest');
 const app = require('../src/app');
-const { runMigrations, truncateTables, closePool } = require('./setup');
+const { runMigrations, truncateTables } = require('./setup');
 const {
   createTestUser,
   createTestTeam,
@@ -21,9 +21,6 @@ afterEach(async () => {
   await truncateTables();
 });
 
-afterAll(async () => {
-  await closePool();
-});
 
 describe('eliminateTeam()', () => {
   it('sets is_eliminated = true and eliminated_in_round on the team', async () => {

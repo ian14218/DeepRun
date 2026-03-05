@@ -8,7 +8,7 @@ const { io: ioc } = require('socket.io-client');
 const request = require('supertest');
 const app = require('../src/app');
 const { initDraftSocket } = require('../src/socket/draftSocket');
-const { runMigrations, truncateTables, closePool } = require('./setup');
+const { runMigrations, truncateTables } = require('./setup');
 const { createTestUser, createTestTeam, createTestPlayer } = require('./factories');
 
 let httpServer, serverAddress;
@@ -31,7 +31,6 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await closePool();
   await new Promise((resolve) => httpServer.close(resolve));
 });
 
@@ -64,10 +63,10 @@ async function setupStartedLeague() {
   return { users, league, players, draftOrder: startRes.body.draft_order };
 }
 
-// Helper — connect a socket client and join a league room
-function connectClient(leagueId) {
+// Helper — connect a socket client with JWT auth and join a league room
+function connectClient(leagueId, token) {
   return new Promise((resolve, reject) => {
-    const socket = ioc(serverAddress, { forceNew: true });
+    const socket = ioc(serverAddress, { forceNew: true, auth: { token } });
     socket.on('connect', () => {
       socket.emit('join-draft', { leagueId });
       resolve(socket);
@@ -80,7 +79,7 @@ describe('Draft WebSocket events', () => {
   it('emits draft:pick to the league room when a pick is made', async () => {
     const { users, league, players, draftOrder } = await setupStartedLeague();
 
-    const socket = await connectClient(league.id);
+    const socket = await connectClient(league.id, users[0].token);
 
     const pickEvent = new Promise((resolve) => socket.on('draft:pick', resolve));
 
@@ -106,7 +105,7 @@ describe('Draft WebSocket events', () => {
   it('emits draft:turn to the league room after a pick', async () => {
     const { users, league, players, draftOrder } = await setupStartedLeague();
 
-    const socket = await connectClient(league.id);
+    const socket = await connectClient(league.id, users[0].token);
 
     const turnEvent = new Promise((resolve) => socket.on('draft:turn', resolve));
 

@@ -6,7 +6,9 @@ import { AuthProvider, useAuth } from './AuthContext';
 vi.mock('../services/api', () => ({
   default: {
     post: vi.fn(),
+    interceptors: { request: { use: vi.fn() } },
   },
+  setOnUnauthorized: vi.fn(),
 }));
 
 import api from '../services/api';

@@ -3,7 +3,7 @@ jest.mock('../src/services/externalApi.service');
 const externalApi = require('../src/services/externalApi.service');
 const { runSyncJob } = require('../src/jobs/statSync.job');
 const pool = require('../src/db');
-const { runMigrations, truncateTables, closePool } = require('./setup');
+const { runMigrations, truncateTables } = require('./setup');
 const { createTestTeam, createTestPlayer, createTestGameStat } = require('./factories');
 
 beforeAll(async () => {
@@ -15,9 +15,6 @@ afterEach(async () => {
   jest.clearAllMocks();
 });
 
-afterAll(async () => {
-  await closePool();
-});
 
 // ─── Shared game fixture builder ───────────────────────────────────────────────
 

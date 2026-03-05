@@ -7,8 +7,11 @@ export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
     const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001' : window.location.origin);
-    const s = io(apiUrl);
+    const s = io(apiUrl, {
+      auth: { token },
+    });
     setSocket(s);
     return () => s.disconnect();
   }, []);

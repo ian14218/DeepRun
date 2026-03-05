@@ -15,6 +15,7 @@ async function getStats() {
     activeDrafts: parseInt(activeDrafts.rows[0].count, 10),
     teamCount: parseInt(teams.rows[0].count, 10),
     playerCount: parseInt(players.rows[0].count, 10),
+    simulationEnabled: process.env.SIMULATION_ENABLED === 'true',
   };
 }
 

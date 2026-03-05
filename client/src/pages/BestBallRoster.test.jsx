@@ -79,12 +79,12 @@ describe('BestBallRoster', () => {
     renderRoster();
 
     await waitFor(() => {
-      // John Star appears in both roster panel and market
+      // Players appear in both mobile + desktop views, so use getAllByText
       expect(screen.getAllByText('John Star').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText('Mike Guard')).toBeInTheDocument();
+      expect(screen.getAllByText('Mike Guard').length).toBeGreaterThanOrEqual(1);
     });
 
-    expect(screen.getByText('$900')).toBeInTheDocument();
+    expect(screen.getAllByText('$900').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders roster panel with budget', async () => {
@@ -131,10 +131,10 @@ describe('BestBallRoster', () => {
     renderRoster();
 
     await waitFor(() => {
-      expect(screen.getByText('Mike Guard')).toBeInTheDocument();
+      expect(screen.getAllByText('Mike Guard').length).toBeGreaterThanOrEqual(1);
     });
 
-    // Find the Add button for Mike Guard (not the "Added" one for John Star)
+    // Find all Add buttons (mobile + desktop each render one for Mike Guard)
     const addButtons = screen.getAllByRole('button', { name: /^Add$/i });
     expect(addButtons.length).toBeGreaterThan(0);
     fireEvent.click(addButtons[0]);
@@ -148,12 +148,13 @@ describe('BestBallRoster', () => {
     renderRoster();
 
     await waitFor(() => {
-      expect(screen.getByText('John Star')).toBeInTheDocument();
+      expect(screen.getAllByText('John Star').length).toBeGreaterThanOrEqual(1);
     });
 
-    // John Star should have "Added" disabled button
-    const addedButton = screen.getByRole('button', { name: /Added/i });
-    expect(addedButton).toBeDisabled();
+    // John Star should have "Added" disabled buttons (mobile + desktop)
+    const addedButtons = screen.getAllByRole('button', { name: /Added/i });
+    expect(addedButtons.length).toBeGreaterThanOrEqual(1);
+    addedButtons.forEach((btn) => expect(btn).toBeDisabled());
   });
 
   it('shows read-only when contest is locked', async () => {

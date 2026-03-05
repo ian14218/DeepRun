@@ -4,6 +4,7 @@ const fs = require('fs');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth.routes');
@@ -33,6 +34,17 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+
+// Global API rate limiting — 200 requests per minute per IP
+if (process.env.NODE_ENV !== 'test') {
+  app.use('/api/', rateLimit({
+    windowMs: 60 * 1000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later' },
+  }));
+}
 
 // Health check with DB ping
 app.get('/api/health', async (req, res) => {

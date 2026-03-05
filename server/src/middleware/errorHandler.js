@@ -12,7 +12,11 @@ function errorHandler(err, req, res, next) { // eslint-disable-line no-unused-va
     console.error('[error]', err);
   }
 
-  res.status(status).json({ error: err.message || 'Internal server error' });
+  // Never leak internal error details (SQL errors, stack traces) for 5xx.
+  // Only expose err.message for client errors (4xx).
+  const message = status < 500 ? (err.message || 'Internal server error') : 'Internal server error';
+
+  res.status(status).json({ error: message });
 }
 
 module.exports = errorHandler;

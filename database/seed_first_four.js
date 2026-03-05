@@ -1,6 +1,15 @@
 /**
- * Seed players for the 4 First Four teams that were added manually.
- * Fetches rosters + season stats from ESPN.
+ * Seed players for First Four teams.
+ *
+ * Dynamically detects First Four teams from the database — any teams that share
+ * the same (seed, region) are First Four pairs. This replaces the previous
+ * hardcoded team list and works for any tournament year.
+ *
+ * Also sets the is_first_four flag and first_four_partner_id for each pair.
+ *
+ * Usage:
+ *   node database/seed_first_four.js             # detect and seed First Four teams
+ *   node database/seed_first_four.js --dry-run   # show detected teams without DB writes
  */
 require('dotenv').config({ path: `${__dirname}/../server/.env` });
 const { Pool } = require('pg');
@@ -8,18 +17,36 @@ const axios = require('axios');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-const TEAMS = [
-  { id: '72275ecc-3f60-49c1-a915-f483bf21bf50', ext: '44', name: 'American Eagles' },
-  { id: '13b3e8d6-5598-46d8-b243-90e617ccfe9b', ext: '2598', name: 'Saint Francis Red Flash' },
-  { id: '5043d3d8-71eb-44bb-949b-c61466d34cd5', ext: '21', name: 'San Diego State Aztecs' },
-  { id: 'afe0b616-43ab-4d92-901e-5827199f2428', ext: '251', name: 'Texas Longhorns' },
-];
+const ESPN_ROSTER_BASE =
+  'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams';
+const ESPN_STATS_BASE =
+  'https://site.web.api.espn.com/apis/common/v3/sports/basketball/mens-college-basketball';
+
+const dryRun = process.argv.includes('--dry-run');
+
+/**
+ * Find First Four teams: teams that share the same (seed, region).
+ * In a standard 64-team bracket, each (seed, region) is unique.
+ * Duplicates mean First Four play-in teams.
+ */
+async function detectFirstFourTeams() {
+  const result = await pool.query(`
+    SELECT t1.id AS team_a_id, t1.name AS team_a_name, t1.external_id AS team_a_ext,
+           t2.id AS team_b_id, t2.name AS team_b_name, t2.external_id AS team_b_ext,
+           t1.seed, t1.region
+    FROM tournament_teams t1
+    JOIN tournament_teams t2
+      ON t1.region = t2.region AND t1.seed = t2.seed AND t1.id < t2.id
+    ORDER BY t1.region, t1.seed
+  `);
+  return result.rows;
+}
 
 async function fetchAndSeedPlayers(teamId, externalId, teamName) {
-  const rosterUrl = `https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams/${externalId}/roster`;
+  const rosterUrl = `${ESPN_ROSTER_BASE}/${externalId}/roster`;
   const resp = await axios.get(rosterUrl);
   const athletes = resp.data.athletes || [];
-  console.log(`${teamName}: found ${athletes.length} players`);
+  console.log(`  ${teamName}: found ${athletes.length} players`);
 
   for (const a of athletes) {
     const name = a.fullName || a.displayName;
@@ -38,8 +65,7 @@ async function fetchAndSeedPlayers(teamId, externalId, teamName) {
     );
   }
 
-  // Fetch season stats for each player (same format as seed_tournament.js)
-  const ESPN_STATS_BASE = 'https://site.web.api.espn.com/apis/common/v3/sports/basketball/mens-college-basketball';
+  // Fetch season stats
   let statsUpdated = 0;
   for (const a of athletes) {
     try {
@@ -79,10 +105,51 @@ async function fetchAndSeedPlayers(teamId, externalId, teamName) {
   console.log(`  Stats updated for ${statsUpdated}/${athletes.length} players`);
 }
 
+async function setFirstFourPair(teamAId, teamBId) {
+  await pool.query(
+    `UPDATE tournament_teams
+     SET is_first_four = true, first_four_partner_id = $2
+     WHERE id = $1`,
+    [teamAId, teamBId]
+  );
+  await pool.query(
+    `UPDATE tournament_teams
+     SET is_first_four = true, first_four_partner_id = $1
+     WHERE id = $2`,
+    [teamAId, teamBId]
+  );
+}
+
 async function main() {
-  for (const t of TEAMS) {
-    await fetchAndSeedPlayers(t.id, t.ext, t.name);
+  const pairs = await detectFirstFourTeams();
+
+  if (pairs.length === 0) {
+    console.log('No First Four teams detected (no duplicate seed+region pairs found).');
+    console.log('Make sure you have run seed_tournament.js first and that First Four teams are included.');
+    await pool.end();
+    return;
   }
+
+  console.log(`Detected ${pairs.length} First Four pair(s):\n`);
+  for (const pair of pairs) {
+    console.log(`  ${pair.region} #${pair.seed}: ${pair.team_a_name} vs ${pair.team_b_name}`);
+  }
+
+  if (dryRun) {
+    console.log('\n--dry-run: no database writes.');
+    await pool.end();
+    return;
+  }
+
+  console.log('\nSeeding rosters and setting First Four flags...\n');
+
+  for (const pair of pairs) {
+    await fetchAndSeedPlayers(pair.team_a_id, pair.team_a_ext, pair.team_a_name);
+    await fetchAndSeedPlayers(pair.team_b_id, pair.team_b_ext, pair.team_b_name);
+    await setFirstFourPair(pair.team_a_id, pair.team_b_id);
+    console.log(`  Set First Four pair: ${pair.team_a_name} <-> ${pair.team_b_name}\n`);
+  }
+
   await pool.end();
   console.log('Done seeding First Four players!');
 }

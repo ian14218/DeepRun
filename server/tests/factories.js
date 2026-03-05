@@ -206,6 +206,15 @@ async function seedBestBallConfig() {
   `);
 }
 
+function resetCounters() {
+  userCounter = 0;
+  teamCounter = 0;
+  playerCounter = 0;
+  leagueCounter = 0;
+  statCounter = 0;
+  contestCounter = 0;
+}
+
 module.exports = {
   createTestUser,
   createTestTeam,
@@ -219,4 +228,5 @@ module.exports = {
   createTestPlayerPrice,
   createTestRosterPlayer,
   seedBestBallConfig,
+  resetCounters,
 };

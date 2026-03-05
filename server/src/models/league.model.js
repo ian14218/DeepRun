@@ -35,8 +35,15 @@ async function findByUserId(userId) {
   return result.rows;
 }
 
+// Allowlist of columns that can be updated via the generic update function.
+// This prevents SQL injection via dynamic column names.
+const UPDATABLE_COLUMNS = new Set([
+  'name', 'team_count', 'roster_size', 'draft_status',
+  'draft_timer_seconds', 'timer_running', 'timer_remaining',
+]);
+
 async function update(id, fields) {
-  const keys = Object.keys(fields);
+  const keys = Object.keys(fields).filter((k) => UPDATABLE_COLUMNS.has(k));
   if (keys.length === 0) return findById(id);
   const setClauses = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
   const values = keys.map((k) => fields[k]);

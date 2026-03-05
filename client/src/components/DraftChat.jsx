@@ -43,8 +43,6 @@ export default function DraftChat({ leagueId }) {
 
     socket.emit('draft:message', {
       leagueId,
-      userId: user.id,
-      username: user.username,
       message: trimmed,
     });
     setInput('');
