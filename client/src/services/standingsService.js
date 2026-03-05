@@ -15,6 +15,11 @@ export async function getScoreboard(leagueId) {
   return res.data;
 }
 
+export async function getMrIrrelevant(leagueId) {
+  const res = await api.get(`/api/leagues/${leagueId}/mr-irrelevant`);
+  return res.data;
+}
+
 export async function getTournamentTeams() {
   const res = await api.get('/api/tournaments/teams');
   return res.data;

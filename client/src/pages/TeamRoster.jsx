@@ -74,6 +74,8 @@ export default function TeamRoster() {
 
   const active = roster.filter((p) => !p.is_eliminated);
   const total = roster.length;
+  const maxPick = Math.max(...roster.map((p) => p.pick_number || 0));
+  const mrIrrelevantId = roster.find((p) => p.pick_number === maxPick)?.player_id;
 
   return (
     <div>
@@ -137,7 +139,7 @@ export default function TeamRoster() {
                 </TableHeader>
                 <TableBody>
                   {roster.map((player) => (
-                    <PlayerRow key={player.player_id} player={player} showRounds={showRounds} />
+                    <PlayerRow key={player.player_id} player={player} showRounds={showRounds} isMrIrrelevant={player.player_id === mrIrrelevantId} />
                   ))}
                 </TableBody>
               </Table>

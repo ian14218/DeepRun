@@ -46,6 +46,7 @@ function renderStandings() {
 beforeEach(() => {
   vi.clearAllMocks();
   standingsService.getStandings.mockResolvedValue(mockStandings);
+  standingsService.getMrIrrelevant.mockResolvedValue([]);
 });
 
 describe('Standings page', () => {

@@ -184,10 +184,39 @@ async function getTeamRoster(leagueId, memberId) {
   });
 }
 
+async function getMrIrrelevant(leagueId) {
+  const result = await pool.query(
+    `SELECT
+       dp.member_id,
+       COALESCE(lm.team_name, u.username) AS team_name,
+       u.username,
+       p.id AS player_id, p.name AS player_name, p.position,
+       p.is_eliminated,
+       tt.name AS team_name_college, tt.seed, tt.external_id AS team_external_id,
+       dp.pick_number,
+       COALESCE(SUM(pgs.points), 0)::int AS total_points
+     FROM draft_picks dp
+     JOIN players p ON p.id = dp.player_id
+     JOIN tournament_teams tt ON tt.id = p.team_id
+     JOIN league_members lm ON lm.id = dp.member_id
+     JOIN users u ON u.id = lm.user_id
+     LEFT JOIN draft_picks dp2 ON dp2.member_id = dp.member_id AND dp2.league_id = dp.league_id AND dp2.pick_number > dp.pick_number
+     LEFT JOIN player_game_stats pgs ON pgs.player_id IN (dp.player_id, dp.paired_player_id)
+     WHERE dp.league_id = $1 AND dp2.id IS NULL
+     GROUP BY dp.member_id, lm.team_name, u.username,
+              p.id, p.name, p.position, p.is_eliminated,
+              tt.name, tt.seed, tt.external_id, dp.pick_number
+     ORDER BY total_points DESC`,
+    [leagueId]
+  );
+  return result.rows;
+}
+
 module.exports = {
   calculateTeamScore,
   getActivePlayerCount,
   getEliminatedPlayerCount,
   getStandings,
   getTeamRoster,
+  getMrIrrelevant,
 };

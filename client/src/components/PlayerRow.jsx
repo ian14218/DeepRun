@@ -12,7 +12,7 @@ const ROUNDS = [
   'Championship',
 ];
 
-export default function PlayerRow({ player, showRounds = false }) {
+export default function PlayerRow({ player, showRounds = false, isMrIrrelevant = false }) {
   const eliminated = player.is_eliminated;
 
   return (
@@ -25,6 +25,14 @@ export default function PlayerRow({ player, showRounds = false }) {
           <span className={cn(eliminated && 'line-through text-muted-foreground')}>
             {player.name}
           </span>
+          {isMrIrrelevant && (
+            <Badge
+              variant="outline"
+              className="ml-2 text-[10px] border-purple-500 text-purple-500"
+            >
+              Mr. Irrelevant
+            </Badge>
+          )}
           {eliminated && (
             <Badge
               data-testid={`elim-badge-${player.player_id}`}

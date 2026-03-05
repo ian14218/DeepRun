@@ -31,6 +31,16 @@ router.get('/teams/:teamId', async (req, res) => {
   }
 });
 
+// GET /api/leagues/:id/mr-irrelevant
+router.get('/mr-irrelevant', async (req, res) => {
+  try {
+    const data = await scoringService.getMrIrrelevant(req.params.id);
+    return res.status(200).json(data);
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // GET /api/leagues/:id/scoreboard
 router.get('/scoreboard', async (req, res) => {
   try {
