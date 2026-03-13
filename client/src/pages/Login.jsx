@@ -104,6 +104,13 @@ export default function Login() {
               Register
             </Link>
           </p>
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            Forgot your password? Email{' '}
+            <a href="mailto:Ian151cartwright@gmail.com" className="text-primary hover:underline">
+              Ian151cartwright@gmail.com
+            </a>
+            {' '}for help.
+          </p>
         </CardContent>
       </Card>
     </div>
