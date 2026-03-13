@@ -29,6 +29,7 @@ import BestBallRoster from './pages/BestBallRoster';
 import BestBallLeaderboard from './pages/BestBallLeaderboard';
 import BestBallEntry from './pages/BestBallEntry';
 import BestBallAdmin from './pages/admin/BestBallAdmin';
+import ChangePassword from './pages/ChangePassword';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -44,6 +45,7 @@ function App() {
             {/* Public — no Navbar */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/change-password" element={<ChangePassword />} />
 
             {/* Protected — wrapped in AppLayout (Navbar + main) */}
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>

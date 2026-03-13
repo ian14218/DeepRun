@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Cpu, Shield, ShieldOff, Trash2, Search } from 'lucide-react';
+import { Cpu, Shield, ShieldOff, Trash2, Search, KeyRound } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { getAdminUsers, deleteAdminUser, toggleAdminStatus } from '../../services/adminService';
+import { getAdminUsers, deleteAdminUser, toggleAdminStatus, resetUserPassword } from '../../services/adminService';
 import { toast } from 'sonner';
 
 export default function AdminUsers() {
@@ -14,6 +14,8 @@ export default function AdminUsers() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [resetTarget, setResetTarget] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
 
   const fetchUsers = useCallback((s = search, p = data.page) => {
     setLoading(true);
@@ -51,6 +53,18 @@ export default function AdminUsers() {
       fetchUsers();
     } catch {
       toast.error('Failed to delete user');
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!resetTarget || !newPassword) return;
+    try {
+      await resetUserPassword(resetTarget.id, newPassword);
+      toast.success(`Password reset for ${resetTarget.username}`);
+      setResetTarget(null);
+      setNewPassword('');
+    } catch {
+      toast.error('Failed to reset password');
     }
   }
 
@@ -131,14 +145,24 @@ export default function AdminUsers() {
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         {!u.is_bot && (
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            title={u.is_admin ? 'Revoke admin' : 'Make admin'}
-                            onClick={() => handleToggleAdmin(u)}
-                          >
-                            {u.is_admin ? <ShieldOff className="h-3.5 w-3.5" /> : <Shield className="h-3.5 w-3.5" />}
-                          </Button>
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              title="Reset password"
+                              onClick={() => { setResetTarget(u); setNewPassword(''); }}
+                            >
+                              <KeyRound className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              title={u.is_admin ? 'Revoke admin' : 'Make admin'}
+                              onClick={() => handleToggleAdmin(u)}
+                            >
+                              {u.is_admin ? <ShieldOff className="h-3.5 w-3.5" /> : <Shield className="h-3.5 w-3.5" />}
+                            </Button>
+                          </>
                         )}
                         <Button
                           variant="ghost"
@@ -198,6 +222,28 @@ export default function AdminUsers() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset password */}
+      <Dialog open={!!resetTarget} onOpenChange={() => setResetTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for <strong>{resetTarget?.username}</strong> ({resetTarget?.email}).
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            type="text"
+            placeholder="New password (min 8 characters)"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetTarget(null)}>Cancel</Button>
+            <Button onClick={handleResetPassword} disabled={newPassword.length < 8}>Reset Password</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

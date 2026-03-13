@@ -9,6 +9,8 @@ const { runSyncForDate } = require('../jobs/statSync.job');
 const bestBallModel = require('../models/bestBall.model');
 const bestBallPricing = require('../services/bestBallPricing.service');
 
+const bcrypt = require('bcryptjs');
+
 const router = express.Router();
 
 // All admin routes require authentication + admin
@@ -59,6 +61,24 @@ router.patch('/users/:id/admin', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     res.json(user);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.patch('/users/:id/reset-password', async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const user = await userModel.updatePasswordHash(req.params.id, passwordHash);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    await userModel.setMustResetPassword(req.params.id, true);
+    res.json({ message: `Password reset for ${user.email}` });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }

@@ -13,7 +13,7 @@ async function createUser(username, email, passwordHash) {
 
 async function findByEmail(email) {
   const result = await pool.query(
-    `SELECT id, username, email, password_hash, is_bot, is_admin, created_at
+    `SELECT id, username, email, password_hash, is_bot, is_admin, must_reset_password, created_at
      FROM users WHERE email = $1`,
     [email]
   );
@@ -91,4 +91,31 @@ async function setAdmin(id, isAdmin) {
   return result.rows[0] || null;
 }
 
-module.exports = { createUser, findByEmail, findById, createBotUser, findBotUsers, findAll, deleteUser, setAdmin };
+async function updatePasswordHash(id, passwordHash) {
+  const result = await pool.query(
+    `UPDATE users SET password_hash = $2 WHERE id = $1
+     RETURNING id, username, email`,
+    [id, passwordHash]
+  );
+  return result.rows[0] || null;
+}
+
+async function setMustResetPassword(id, value) {
+  const result = await pool.query(
+    `UPDATE users SET must_reset_password = $2 WHERE id = $1
+     RETURNING id, username, email, must_reset_password`,
+    [id, value]
+  );
+  return result.rows[0] || null;
+}
+
+async function findByIdWithHash(id) {
+  const result = await pool.query(
+    `SELECT id, username, email, password_hash, must_reset_password
+     FROM users WHERE id = $1`,
+    [id]
+  );
+  return result.rows[0] || null;
+}
+
+module.exports = { createUser, findByEmail, findById, createBotUser, findBotUsers, findAll, deleteUser, setAdmin, updatePasswordHash, setMustResetPassword, findByIdWithHash };

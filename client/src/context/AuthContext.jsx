@@ -61,12 +61,15 @@ export function AuthProvider({ children }) {
   async function login(email, password) {
     const res = await api.post('/api/auth/login', { email, password });
     const { token: newToken, user: newUser } = res.data;
-    // Ensure is_admin is stored
-    const userWithAdmin = { ...newUser, is_admin: newUser.is_admin || false };
+    const userData = {
+      ...newUser,
+      is_admin: newUser.is_admin || false,
+      must_reset_password: newUser.must_reset_password || false,
+    };
     localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(userWithAdmin));
+    localStorage.setItem('user', JSON.stringify(userData));
     setToken(newToken);
-    setUser(userWithAdmin);
+    setUser(userData);
   }
 
   async function register(username, email, password) {
@@ -75,8 +78,15 @@ export function AuthProvider({ children }) {
     await login(email, password);
   }
 
+  async function changePassword(currentPassword, newPassword) {
+    await api.patch('/api/auth/change-password', { currentPassword, newPassword });
+    const updatedUser = { ...user, must_reset_password: false };
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    setUser(updatedUser);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, changePassword }}>
       {children}
     </AuthContext.Provider>
   );

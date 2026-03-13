@@ -47,7 +47,42 @@ async function login(email, password) {
     { expiresIn: JWT_EXPIRY }
   );
 
-  return { token, user: { id: user.id, username: user.username, email: user.email, is_admin: user.is_admin || false } };
+  return {
+    token,
+    user: {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      is_admin: user.is_admin || false,
+      must_reset_password: user.must_reset_password || false,
+    },
+  };
 }
 
-module.exports = { register, login };
+async function changePassword(userId, currentPassword, newPassword) {
+  const user = await userModel.findByIdWithHash(userId);
+  if (!user) {
+    const err = new Error('User not found');
+    err.status = 404;
+    throw err;
+  }
+
+  const match = await bcrypt.compare(currentPassword, user.password_hash);
+  if (!match) {
+    const err = new Error('Current password is incorrect');
+    err.status = 401;
+    throw err;
+  }
+
+  if (newPassword.length < 8) {
+    const err = new Error('New password must be at least 8 characters');
+    err.status = 400;
+    throw err;
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+  await userModel.updatePasswordHash(userId, passwordHash);
+  await userModel.setMustResetPassword(userId, false);
+}
+
+module.exports = { register, login, changePassword };

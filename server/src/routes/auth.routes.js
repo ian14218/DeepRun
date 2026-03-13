@@ -1,6 +1,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const authService = require('../services/auth.service');
+const { authenticateToken } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
@@ -42,6 +43,25 @@ router.post('/login', authLimiter, async (req, res) => {
   try {
     const result = await authService.login(email, password);
     return res.status(200).json(result);
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.patch('/change-password', authLimiter, authenticateToken, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+  }
+
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters' });
+  }
+
+  try {
+    await authService.changePassword(req.user.id, currentPassword, newPassword);
+    return res.json({ message: 'Password changed successfully' });
   } catch (err) {
     return res.status(err.status || 500).json({ error: err.message });
   }

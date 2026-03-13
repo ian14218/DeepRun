@@ -16,6 +16,10 @@ export function toggleAdminStatus(id, isAdmin) {
   return api.patch(`/api/admin/users/${id}/admin`, { is_admin: isAdmin }).then((r) => r.data);
 }
 
+export function resetUserPassword(id, newPassword) {
+  return api.patch(`/api/admin/users/${id}/reset-password`, { newPassword }).then((r) => r.data);
+}
+
 export function getAdminLeagues(search = '', status = '', page = 1, limit = 20) {
   return api.get('/api/admin/leagues', { params: { search, status, page, limit } }).then((r) => r.data);
 }
