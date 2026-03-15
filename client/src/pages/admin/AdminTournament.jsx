@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { getAdminStats, getAdminTeams, getAdminPlayers, simulateTournamentRound, resetSimulation, getFirstFourPairs, createFirstFourPair, removeFirstFourPair } from '../../services/adminService';
+import { getAdminStats, getAdminTeams, getAdminPlayers, simulateTournamentRound, resetSimulation, getFirstFourPairs, createFirstFourPair, removeFirstFourPair, backfillSync, seedTournament, seedFirstFour } from '../../services/adminService';
 import { toast } from 'sonner';
 import TeamLogo from '../../components/TeamLogo';
 
@@ -31,6 +31,13 @@ export default function AdminTournament() {
   const [ffTeamA, setFfTeamA] = useState('');
   const [ffTeamB, setFfTeamB] = useState('');
   const [ffLoading, setFfLoading] = useState(false);
+
+  // Setup tab state
+  const [seedYear, setSeedYear] = useState(2026);
+  const [seeding, setSeeding] = useState(false);
+  const [seedingFf, setSeedingFf] = useState(false);
+  const [backfillDates, setBackfillDates] = useState('');
+  const [backfilling, setBackfilling] = useState(false);
 
   useEffect(() => {
     getAdminStats()
@@ -139,6 +146,54 @@ export default function AdminTournament() {
     }
   }
 
+  async function handleSeedTournament() {
+    setSeeding(true);
+    try {
+      const result = await seedTournament(seedYear);
+      toast.success(result.message);
+      if (result.note) toast.info(result.note);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Seed failed');
+    } finally {
+      setSeeding(false);
+    }
+  }
+
+  async function handleSeedFirstFour() {
+    setSeedingFf(true);
+    try {
+      const result = await seedFirstFour();
+      toast.success(result.message);
+      fetchFfPairs();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'First Four seed failed');
+    } finally {
+      setSeedingFf(false);
+    }
+  }
+
+  async function handleBackfill() {
+    const dates = backfillDates
+      .split('\n')
+      .map((d) => d.trim())
+      .filter(Boolean);
+    if (dates.length === 0) {
+      toast.error('Enter at least one date');
+      return;
+    }
+    setBackfilling(true);
+    try {
+      const result = await backfillSync(dates);
+      const total = result.results.reduce((sum, r) => sum + (r.gamesProcessed || 0), 0);
+      toast.success(`Backfill complete: ${result.results.length} date(s), ${total} game(s) processed`);
+      setBackfillDates('');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Backfill failed');
+    } finally {
+      setBackfilling(false);
+    }
+  }
+
   const playerTotalPages = Math.ceil(playerData.total / playerData.limit);
 
   return (
@@ -150,6 +205,7 @@ export default function AdminTournament() {
           <TabsTrigger value="teams">Teams</TabsTrigger>
           <TabsTrigger value="players">Players</TabsTrigger>
           <TabsTrigger value="firstfour">First Four</TabsTrigger>
+          <TabsTrigger value="setup">Setup</TabsTrigger>
         </TabsList>
 
         <TabsContent value="teams">
@@ -414,6 +470,74 @@ export default function AdminTournament() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="setup">
+          <div className="space-y-4">
+            {/* Seed Tournament */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Seed Tournament</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Import teams and rosters from ESPN. Runs in the background — check server logs for progress.
+                </p>
+              </CardHeader>
+              <CardContent className="flex items-end gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Year</label>
+                  <Input
+                    type="number"
+                    value={seedYear}
+                    onChange={(e) => setSeedYear(parseInt(e.target.value, 10))}
+                    min={2020}
+                    max={2030}
+                    className="w-28"
+                  />
+                </div>
+                <Button onClick={handleSeedTournament} disabled={seeding}>
+                  {seeding ? 'Seeding...' : 'Seed Tournament'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Seed First Four */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Seed First Four Pairs</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Auto-detect First Four pairs from tournament data. Run after tournament seeding completes.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <Button onClick={handleSeedFirstFour} disabled={seedingFf}>
+                  {seedingFf ? 'Seeding...' : 'Seed First Four'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Backfill Stats */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Backfill Stats</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Sync game stats from ESPN for specific dates. Use YYYYMMDD format, one date per line.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <textarea
+                  value={backfillDates}
+                  onChange={(e) => setBackfillDates(e.target.value)}
+                  placeholder={"20260319\n20260320"}
+                  rows={4}
+                  className="w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground"
+                />
+                <div>
+                  <Button onClick={handleBackfill} disabled={backfilling}>
+                    {backfilling ? 'Backfilling...' : 'Backfill'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 

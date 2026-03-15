@@ -63,3 +63,15 @@ export function createFirstFourPair(teamAId, teamBId) {
 export function removeFirstFourPair(teamId) {
   return api.delete(`/api/admin/tournament/first-four-pairs/${teamId}`).then((r) => r.data);
 }
+
+export function backfillSync(dates) {
+  return api.post('/api/admin/sync/backfill', { dates }).then((r) => r.data);
+}
+
+export function seedTournament(year = 2026) {
+  return api.post('/api/admin/tournament/seed', { year }).then((r) => r.data);
+}
+
+export function seedFirstFour() {
+  return api.post('/api/admin/tournament/seed-first-four').then((r) => r.data);
+}
