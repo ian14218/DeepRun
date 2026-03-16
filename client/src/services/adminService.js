@@ -75,3 +75,7 @@ export function seedTournament(year = 2026) {
 export function seedFirstFour() {
   return api.post('/api/admin/tournament/seed-first-four').then((r) => r.data);
 }
+
+export function togglePlayerInjury(playerId, injuryStatus) {
+  return api.patch(`/api/admin/tournament/players/${playerId}/injury`, { injury_status: injuryStatus }).then((r) => r.data);
+}

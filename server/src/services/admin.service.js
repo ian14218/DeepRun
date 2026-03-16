@@ -156,7 +156,7 @@ async function getTournamentPlayers(search = '', team = '', page = 1, limit = 20
 
   const result = await pool.query(
     `SELECT p.id, p.name, p.position, p.jersey_number, p.is_eliminated,
-            p.season_ppg, p.season_rpg, p.season_apg,
+            p.injury_status, p.season_ppg, p.season_rpg, p.season_apg,
             t.name AS team_name, t.seed AS team_seed, t.region AS team_region,
             t.external_id AS team_external_id
      FROM players p

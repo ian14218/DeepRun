@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { getAdminStats, getAdminTeams, getAdminPlayers, simulateTournamentRound, resetSimulation, getFirstFourPairs, createFirstFourPair, removeFirstFourPair, backfillSync, seedTournament, seedFirstFour } from '../../services/adminService';
+import { getAdminStats, getAdminTeams, getAdminPlayers, simulateTournamentRound, resetSimulation, getFirstFourPairs, createFirstFourPair, removeFirstFourPair, backfillSync, seedTournament, seedFirstFour, togglePlayerInjury } from '../../services/adminService';
 import { toast } from 'sonner';
 import TeamLogo from '../../components/TeamLogo';
 
@@ -194,6 +194,17 @@ export default function AdminTournament() {
     }
   }
 
+  async function handleToggleInjury(player) {
+    const newStatus = player.injury_status === 'Out' ? null : 'Out';
+    try {
+      await togglePlayerInjury(player.id, newStatus);
+      toast.success(`${player.name} marked as ${newStatus === 'Out' ? 'OUT' : 'Active'}`);
+      fetchPlayers(playerSearch, playerTeamFilter, playerData.page);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update injury status');
+    }
+  }
+
   const playerTotalPages = Math.ceil(playerData.total / playerData.limit);
 
   return (
@@ -319,18 +330,19 @@ export default function AdminTournament() {
                     <TableHead>RPG</TableHead>
                     <TableHead>APG</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Injury</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {playersLoading ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         Loading...
                       </TableCell>
                     </TableRow>
                   ) : playerData.players.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         No players found
                       </TableCell>
                     </TableRow>
@@ -355,6 +367,16 @@ export default function AdminTournament() {
                           ) : (
                             <Badge variant="default">Active</Badge>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant={p.injury_status === 'Out' ? 'destructive' : 'outline'}
+                            onClick={() => handleToggleInjury(p)}
+                            className="h-7 text-xs px-2"
+                          >
+                            {p.injury_status === 'Out' ? 'OUT' : 'Healthy'}
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
