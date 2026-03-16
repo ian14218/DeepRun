@@ -459,7 +459,7 @@ export default function DraftRoom() {
               pickedPlayerIds={pickedPlayerIds}
             />
           </div>
-          <div className="shrink-0">
+          <div className="shrink-0 max-h-[35%]">
             <DraftChat leagueId={leagueId} />
           </div>
         </div>

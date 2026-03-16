@@ -13,7 +13,7 @@ export default function DraftChat({ leagueId }) {
   const socket = useSocket();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export default function DraftChat({ leagueId }) {
 
       {!collapsed && (
         <CardContent className="flex flex-col flex-1 p-0 min-h-0">
-          <div className="flex-1 overflow-y-auto p-3 space-y-2 max-h-64 lg:max-h-96">
+          <div className="flex-1 overflow-y-auto p-3 space-y-2 max-h-48 lg:max-h-56">
             {messages.length === 0 && (
               <p className="text-xs text-muted-foreground text-center py-4">No messages yet</p>
             )}
