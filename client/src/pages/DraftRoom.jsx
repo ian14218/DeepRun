@@ -440,8 +440,8 @@ export default function DraftRoom() {
       )}
 
       {/* Draft board + Player list + Chat */}
-      <div className="grid grid-cols-1 md:grid-cols-5 lg:grid-cols-3 gap-4">
-        <div className="md:col-span-3 lg:col-span-2">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="md:col-span-3">
           <DraftBoard
             picks={draftState.picks}
             teamCount={league.team_count}
@@ -451,7 +451,7 @@ export default function DraftRoom() {
             currentTurn={draftState.current_turn}
           />
         </div>
-        <div className="md:col-span-2 lg:col-span-1 flex flex-col gap-3 md:h-[calc(100vh-200px)] md:min-h-[400px] md:sticky md:top-4 min-w-0">
+        <div className="md:col-span-2 flex flex-col gap-3 md:h-[calc(100vh-200px)] md:min-h-[400px] md:sticky md:top-4 min-w-0">
           <div className="flex-1 min-h-0 min-w-0">
             <PlayerList
               canPick={isMyTurn}
@@ -459,7 +459,7 @@ export default function DraftRoom() {
               pickedPlayerIds={pickedPlayerIds}
             />
           </div>
-          <div className="shrink-0 max-h-[35%]">
+          <div className="shrink-0 md:max-h-[35%]">
             <DraftChat leagueId={leagueId} />
           </div>
         </div>
