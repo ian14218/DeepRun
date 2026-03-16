@@ -2,6 +2,7 @@ const express = require('express');
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { requireAdmin } = require('../middleware/admin.middleware');
 const adminService = require('../services/admin.service');
+const pool = require('../db');
 const simulationService = require('../services/simulation.service');
 const userModel = require('../models/user.model');
 const tournamentTeamModel = require('../models/tournamentTeam.model');
@@ -137,6 +138,27 @@ router.get('/tournament/players', async (req, res) => {
     const { search = '', team = '', page = 1, limit = 20 } = req.query;
     const result = await adminService.getTournamentPlayers(search, team, parseInt(page), parseInt(limit));
     res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Toggle player injury status
+router.patch('/tournament/players/:id/injury', async (req, res) => {
+  try {
+    const { injury_status } = req.body;
+    const validStatuses = ['Out', null];
+    if (!validStatuses.includes(injury_status)) {
+      return res.status(400).json({ error: 'injury_status must be "Out" or null' });
+    }
+    const result = await pool.query(
+      'UPDATE players SET injury_status = $1 WHERE id = $2 RETURNING id, name, injury_status',
+      [injury_status, req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }
