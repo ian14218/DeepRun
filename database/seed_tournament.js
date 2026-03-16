@@ -26,6 +26,12 @@ const R64_DATES = {
   2026: ['20260319', '20260320'], // estimated — update when announced
 };
 
+// First Four dates (play-in games, typically Tue-Wed before R64)
+const FIRST_FOUR_DATES = {
+  2025: ['20250318', '20250319'],
+  2026: ['20260317', '20260318'],
+};
+
 const args = process.argv.slice(2);
 const yearIdx = args.indexOf('--year');
 const year = yearIdx >= 0 ? parseInt(args[yearIdx + 1], 10) : 2026;
@@ -45,10 +51,13 @@ async function fetchAllTeams() {
     throw new Error(`No tournament dates configured for year ${year}. Update R64_DATES in seed_tournament.js.`);
   }
 
-  console.log(`Fetching ${year} tournament games from ESPN (dates: ${dates.join(', ')})...`);
+  const ffDates = FIRST_FOUR_DATES[year] || [];
+  const allDates = [...ffDates, ...dates];
+
+  console.log(`Fetching ${year} tournament games from ESPN (dates: ${allDates.join(', ')})...`);
 
   const responses = await Promise.all(
-    dates.map((d) =>
+    allDates.map((d) =>
       axios.get(`${ESPN_BASE}/scoreboard`, { params: { dates: d, groups: 100, limit: 50 } })
     )
   );
@@ -59,11 +68,16 @@ async function fetchAllTeams() {
       const region = extractRegion(event.competitions?.[0]?.notes);
       for (const comp of event.competitions?.[0]?.competitors || []) {
         const id = String(comp.id || comp.team?.id);
+        const seed = comp.curatedRank?.current || null;
+
+        // Skip TBD/placeholder teams with invalid seeds (ESPN uses 99 for TBD)
+        if (seed === null || seed < 1 || seed > 16) continue;
+
         if (!teams.has(id)) {
           teams.set(id, {
             external_id: id,
             name: comp.team?.displayName,
-            seed: comp.curatedRank?.current || null,
+            seed,
             region,
           });
         }
@@ -215,6 +229,9 @@ async function seed() {
   }
 
   console.log(`\nSeed complete: ${teams.length} teams, ${totalPlayers} players, ${statsFound} with season stats.`);
+  if (teams.length !== 68) {
+    console.log(`WARNING: Expected 68 teams, got ${teams.length}. First Four games may not be scheduled yet — re-run after they are.`);
+  }
   await pool.end();
 }
 
