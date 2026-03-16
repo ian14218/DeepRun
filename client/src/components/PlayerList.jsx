@@ -77,7 +77,7 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
 
   return (
     <>
-      <Card className="flex flex-col h-[60vh] min-h-[350px] md:h-[70vh] lg:h-full min-w-0 overflow-hidden">
+      <Card className="flex flex-col h-[60vh] min-h-[350px] md:h-full min-w-0 overflow-hidden">
         <CardHeader className="pb-2 pt-3 px-3 space-y-2 shrink-0 overflow-hidden">
           <CardTitle className="text-sm font-semibold">Available Players ({visible.length})</CardTitle>
           <div className="flex gap-2 min-w-0">
