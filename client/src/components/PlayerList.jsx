@@ -77,23 +77,23 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
 
   return (
     <>
-      <Card className="flex flex-col h-[450px] lg:h-full min-w-0 overflow-hidden">
-        <CardHeader className="pb-3 space-y-3 shrink-0 overflow-hidden">
-          <CardTitle className="text-base">Available Players</CardTitle>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search players..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8"
-            />
-          </div>
+      <Card className="flex flex-col h-[60vh] min-h-[350px] md:h-[70vh] lg:h-full min-w-0 overflow-hidden">
+        <CardHeader className="pb-2 pt-3 px-3 space-y-2 shrink-0 overflow-hidden">
+          <CardTitle className="text-sm font-semibold">Available Players ({visible.length})</CardTitle>
           <div className="flex gap-2 min-w-0">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-7 h-8 text-sm"
+              />
+            </div>
             <select
               value={teamFilter}
               onChange={(e) => setTeamFilter(e.target.value)}
-              className="min-w-0 flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              className="min-w-0 w-28 h-8 rounded-md border border-input bg-background px-2 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             >
               <option value="">All teams</option>
               {teams.map((t) => (
@@ -103,10 +103,10 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="shrink-0 w-24 h-9 rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              className="shrink-0 w-20 h-8 rounded-md border border-input bg-background px-1.5 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             >
-              <option value="ppg">By PPG</option>
-              <option value="seed">By Seed</option>
+              <option value="ppg">PPG</option>
+              <option value="seed">Seed</option>
             </select>
           </div>
         </CardHeader>
