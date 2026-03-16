@@ -77,13 +77,14 @@ async function addPlayer(entryId, playerId, inputPairedPlayerId = null) {
 
   // Block adding eliminated players
   const playerCheck = await pool.query(
-    `SELECT p.is_eliminated, tt.is_first_four, tt.first_four_partner_id, tt.is_eliminated AS team_eliminated
+    `SELECT p.is_eliminated, p.injury_status, tt.is_first_four, tt.first_four_partner_id, tt.is_eliminated AS team_eliminated
      FROM players p JOIN tournament_teams tt ON tt.id = p.team_id WHERE p.id = $1`,
     [playerId]
   );
   const playerInfo = playerCheck.rows[0];
   if (!playerInfo) throw createError('Player not found', 404);
   if (playerInfo.is_eliminated) throw createError('Cannot add an eliminated player', 400);
+  if (playerInfo.injury_status === 'Out') throw createError('Cannot add a player who is out with an injury', 400);
 
   // First Four pairing: only required if the partner team is still alive
   const partnerAlive = playerInfo.is_first_four && playerInfo.first_four_partner_id

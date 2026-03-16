@@ -94,7 +94,7 @@ async function getPlayerPrices(contestId, { search, minPrice, maxPrice, seed, so
     pool.query(
       `SELECT bp.id AS price_id, bp.price, bp.contest_id,
               p.id AS player_id, p.name, p.position, p.season_ppg, p.season_mpg,
-              p.is_eliminated,
+              p.is_eliminated, p.injury_status,
               tt.id AS team_id, tt.name AS team_name, tt.seed, tt.region, tt.external_id AS team_external_id,
               tt.is_first_four, tt.first_four_partner_id
        FROM best_ball_player_prices bp

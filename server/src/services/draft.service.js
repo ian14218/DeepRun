@@ -117,13 +117,14 @@ async function autoPickOnTimeout(leagueId, io) {
   const onTheClock = members.find((m) => m.draft_position === currentPos);
   if (!onTheClock) return;
 
-  // Pick a random available non-eliminated player (exclude both primary and paired IDs)
+  // Pick a random available non-eliminated, non-injured player (exclude both primary and paired IDs)
   const draftedPlayerIds = picks.flatMap((p) => [p.player_id, p.paired_player_id].filter(Boolean));
   const availableResult = await pool.query(
     `SELECT p.id, tt.is_first_four, tt.first_four_partner_id, tt.is_eliminated AS team_eliminated
      FROM players p
      JOIN tournament_teams tt ON tt.id = p.team_id
      WHERE p.id != ALL($1::uuid[]) AND p.is_eliminated = false
+       AND COALESCE(p.injury_status, '') != 'Out'
      ORDER BY RANDOM() LIMIT 1`,
     [draftedPlayerIds]
   );
@@ -138,6 +139,7 @@ async function autoPickOnTimeout(leagueId, io) {
       const partnerResult = await pool.query(
         `SELECT p.id FROM players p
          WHERE p.team_id = $1 AND p.id != ALL($2::uuid[]) AND p.is_eliminated = false
+           AND COALESCE(p.injury_status, '') != 'Out'
          ORDER BY RANDOM() LIMIT 1`,
         [chosen.first_four_partner_id, draftedPlayerIds]
       );
@@ -271,6 +273,11 @@ async function makePick(leagueId, userId, playerId, inputPairedPlayerId = null) 
   // Block picking eliminated players
   if (player.is_eliminated) {
     const e = new Error('Cannot draft an eliminated player'); e.status = 400; throw e;
+  }
+
+  // Block picking injured (OUT) players
+  if (player.injury_status === 'Out') {
+    const e = new Error('Cannot draft a player who is out with an injury'); e.status = 400; throw e;
   }
 
   const team = await tournamentTeamModel.findById(player.team_id);
@@ -462,13 +469,14 @@ async function autoPick(leagueId, io) {
     const onTheClock = members.find((m) => m.draft_position === currentPos);
     if (!onTheClock || !onTheClock.is_bot) break; // human's turn — stop
 
-    // Pick a random available non-eliminated player (exclude both primary and paired IDs)
+    // Pick a random available non-eliminated, non-injured player (exclude both primary and paired IDs)
     const draftedPlayerIds = picks.flatMap((p) => [p.player_id, p.paired_player_id].filter(Boolean));
     const availableResult = await pool.query(
       `SELECT p.id, tt.is_first_four, tt.first_four_partner_id
        FROM players p
        JOIN tournament_teams tt ON tt.id = p.team_id
        WHERE p.id != ALL($1::uuid[]) AND p.is_eliminated = false
+         AND COALESCE(p.injury_status, '') != 'Out'
        ORDER BY RANDOM() LIMIT 1`,
       [draftedPlayerIds]
     );

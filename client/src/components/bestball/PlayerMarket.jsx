@@ -129,23 +129,25 @@ export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd
           players.map((player) => {
             const isRostered = rosteredIds.has(player.player_id);
             const isEliminated = player.is_eliminated;
+            const isInjured = player.injury_status === 'Out';
             const tooExpensive = player.price > budgetRemaining;
+            const unavailable = isRostered || isEliminated || isInjured;
 
             return (
               <div
                 key={player.player_id}
-                className={`flex items-center gap-3 p-3 border rounded-lg ${isRostered || isEliminated ? 'opacity-50' : ''}`}
+                className={`flex items-center gap-3 p-3 border rounded-lg ${unavailable ? 'opacity-50' : ''}`}
               >
                 <TeamLogo externalId={player.team_external_id} teamName={player.team_name} size={24} />
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm truncate">
                     {player.name}
-                    {isEliminated && (
+                    {(isEliminated || isInjured) && (
                       <Badge variant="destructive" className="ml-1.5 text-[10px] px-1 py-0">
                         OUT
                       </Badge>
                     )}
-                    {player.is_first_four && !isEliminated && (
+                    {player.is_first_four && !isEliminated && !isInjured && (
                       <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0 bg-amber-500/15 text-amber-600 border-amber-500/30">
                         FF
                       </Badge>
@@ -162,11 +164,11 @@ export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd
                     <Button
                       size="sm"
                       variant={isRostered ? 'outline' : 'default'}
-                      disabled={isRostered || isEliminated || tooExpensive}
+                      disabled={unavailable || tooExpensive}
                       onClick={() => handleAddClick(player)}
                       className="h-8 px-3"
                     >
-                      {isRostered ? 'Added' : isEliminated ? 'Out' : 'Add'}
+                      {isRostered ? 'Added' : isEliminated || isInjured ? 'Out' : 'Add'}
                     </Button>
                   )}
                 </div>
@@ -206,21 +208,23 @@ export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd
               players.map((player) => {
                 const isRostered = rosteredIds.has(player.player_id);
                 const isEliminated = player.is_eliminated;
+                const isInjured = player.injury_status === 'Out';
                 const tooExpensive = player.price > budgetRemaining;
+                const unavailable = isRostered || isEliminated || isInjured;
 
                 return (
-                  <TableRow key={player.player_id} className={isRostered || isEliminated ? 'opacity-50' : ''}>
+                  <TableRow key={player.player_id} className={unavailable ? 'opacity-50' : ''}>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <TeamLogo externalId={player.team_external_id} teamName={player.team_name} size={18} />
                         <p className="font-medium">
                           {player.name}
-                          {isEliminated && (
+                          {(isEliminated || isInjured) && (
                             <Badge variant="destructive" className="ml-1.5 text-[10px] px-1 py-0">
                               OUT
                             </Badge>
                           )}
-                          {player.is_first_four && !isEliminated && (
+                          {player.is_first_four && !isEliminated && !isInjured && (
                             <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0 bg-amber-500/15 text-amber-600 border-amber-500/30">
                               FF
                             </Badge>
@@ -243,10 +247,10 @@ export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={isRostered || isEliminated || tooExpensive}
+                          disabled={unavailable || tooExpensive}
                           onClick={() => handleAddClick(player)}
                         >
-                          {isRostered ? 'Added' : isEliminated ? 'Out' : 'Add'}
+                          {isRostered ? 'Added' : isEliminated || isInjured ? 'Out' : 'Add'}
                         </Button>
                       </TableCell>
                     )}
