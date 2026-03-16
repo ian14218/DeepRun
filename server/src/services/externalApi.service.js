@@ -204,6 +204,7 @@ async function fetchTeamRoster(externalTeamId) {
     name: a.displayName,
     position: a.position?.abbreviation || 'F',
     jersey_number: parseInt(a.jersey, 10) || 0,
+    injury_status: a.injuries?.[0]?.status || null,
   }));
 }
 

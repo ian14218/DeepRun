@@ -31,6 +31,7 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
     .filter((p) => {
       if (pickedPlayerIds.includes(p.id)) return false;
       if (p.is_eliminated || p.team_is_eliminated) return false;
+      if (p.injury_status === 'Out') return false;
       if ((p.season_ppg || 0) < 3) return false;
       if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
       if (teamFilter && p.team_name !== teamFilter) return false;
@@ -124,6 +125,11 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
                       <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
                         {p.position}
                       </Badge>
+                      {p.injury_status === 'Out' && (
+                        <Badge variant="destructive" className="text-[10px] px-1 py-0 shrink-0">
+                          INJ
+                        </Badge>
+                      )}
                       {p.is_first_four && (
                         <Badge variant="secondary" className="text-[10px] px-1 py-0 shrink-0 bg-amber-500/15 text-amber-600 border-amber-500/30">
                           FF

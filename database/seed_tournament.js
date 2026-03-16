@@ -90,12 +90,17 @@ async function fetchAllTeams() {
 
 async function fetchRoster(externalTeamId) {
   const resp = await axios.get(`${ESPN_BASE}/teams/${externalTeamId}/roster`);
-  return (resp.data.athletes || []).map((a) => ({
-    external_id: String(a.id),
-    name: a.displayName,
-    position: a.position?.abbreviation || 'F',
-    jersey_number: parseInt(a.jersey, 10) || 0,
-  }));
+  return (resp.data.athletes || []).map((a) => {
+    // ESPN includes an injuries array on athletes when available
+    const injuryStatus = a.injuries?.[0]?.status || null;
+    return {
+      external_id: String(a.id),
+      name: a.displayName,
+      position: a.position?.abbreviation || 'F',
+      jersey_number: parseInt(a.jersey, 10) || 0,
+      injury_status: injuryStatus,
+    };
+  });
 }
 
 /**
@@ -199,12 +204,13 @@ async function seed() {
     // Insert players and fetch their season stats
     for (const p of players) {
       await pool.query(
-        `INSERT INTO players (name, team_id, position, jersey_number, external_id)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO players (name, team_id, position, jersey_number, external_id, injury_status)
+         VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (external_id) DO UPDATE
            SET name = EXCLUDED.name, team_id = EXCLUDED.team_id,
-               position = EXCLUDED.position, jersey_number = EXCLUDED.jersey_number`,
-        [p.name, teamId, p.position, p.jersey_number, p.external_id]
+               position = EXCLUDED.position, jersey_number = EXCLUDED.jersey_number,
+               injury_status = EXCLUDED.injury_status`,
+        [p.name, teamId, p.position, p.jersey_number, p.external_id, p.injury_status]
       );
 
       // Fetch and store season stats
@@ -224,8 +230,10 @@ async function seed() {
       await delay(50);
     }
 
+    const injuredCount = players.filter((p) => p.injury_status === 'Out').length;
     totalPlayers += players.length;
-    console.log(`  ${team.region} #${team.seed} ${team.name}: ${players.length} players`);
+    const injuredNote = injuredCount > 0 ? ` (${injuredCount} OUT)` : '';
+    console.log(`  ${team.region} #${team.seed} ${team.name}: ${players.length} players${injuredNote}`);
   }
 
   console.log(`\nSeed complete: ${teams.length} teams, ${totalPlayers} players, ${statsFound} with season stats.`);
