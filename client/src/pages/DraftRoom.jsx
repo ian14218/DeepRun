@@ -64,7 +64,16 @@ export default function DraftRoom() {
   useEffect(() => {
     if (!socket) return;
 
-    socket.emit('join-draft', { leagueId });
+    // Join the draft room (and re-join + reload on reconnect, which is
+    // critical for mobile where connections drop frequently)
+    const joinAndLoad = () => {
+      socket.emit('join-draft', { leagueId });
+      loadData();
+    };
+
+    joinAndLoad();
+    socket.on('connect', joinAndLoad);
+
     socket.on('draft:started', () => loadData());
     socket.on('draft:pick', () => loadData());
     socket.on('draft:turn', (turn) => {
@@ -108,6 +117,7 @@ export default function DraftRoom() {
 
     return () => {
       socket.emit('leave-draft', { leagueId });
+      socket.off('connect', joinAndLoad);
       socket.off('draft:started');
       socket.off('draft:pick');
       socket.off('draft:turn');
@@ -136,6 +146,9 @@ export default function DraftRoom() {
     try {
       await makePick(leagueId, pendingPick.playerId, pendingPick.pairedPlayerId);
       toast.success('Pick made!');
+      // Immediately refresh draft state so the UI updates even if the
+      // socket event is delayed or lost (common on mobile connections)
+      loadData();
     } catch (e) {
       toast.error(e.response?.data?.error || e.message);
     } finally {
