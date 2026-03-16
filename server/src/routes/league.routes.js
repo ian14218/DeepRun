@@ -75,6 +75,20 @@ router.post('/:id/fill-bots', async (req, res) => {
   }
 });
 
+// PUT /api/leagues/:id/draft-order — set custom draft order (commissioner only, pre-draft only)
+router.put('/:id/draft-order', async (req, res) => {
+  const { memberIds } = req.body;
+  if (!Array.isArray(memberIds)) {
+    return res.status(400).json({ error: 'memberIds array is required' });
+  }
+  try {
+    const members = await leagueService.setDraftOrder(req.params.id, req.user.id, memberIds);
+    return res.status(200).json({ members });
+  } catch (err) {
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // PUT /api/leagues/:id — update league settings (commissioner only, pre-draft only)
 router.put('/:id', async (req, res) => {
   try {

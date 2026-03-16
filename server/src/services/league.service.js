@@ -232,6 +232,64 @@ async function removeMemberByCommissioner(leagueId, targetUserId, commissionerId
   return removed;
 }
 
+async function setDraftOrder(leagueId, userId, orderedMemberIds) {
+  const league = await leagueModel.findById(leagueId);
+  if (!league) {
+    const err = new Error('League not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (league.commissioner_id !== userId) {
+    const err = new Error('Only the commissioner can set the draft order');
+    err.status = 403;
+    throw err;
+  }
+
+  if (league.draft_status !== 'pre_draft') {
+    const err = new Error('Draft order cannot be changed after the draft has started');
+    err.status = 400;
+    throw err;
+  }
+
+  if (!Array.isArray(orderedMemberIds) || orderedMemberIds.length === 0) {
+    const err = new Error('orderedMemberIds must be a non-empty array');
+    err.status = 400;
+    throw err;
+  }
+
+  const members = await leagueModel.findMembersByLeague(leagueId);
+  const memberIdSet = new Set(members.map((m) => m.id));
+
+  // Validate all IDs are actual members and no duplicates
+  const seen = new Set();
+  for (const mid of orderedMemberIds) {
+    if (!memberIdSet.has(mid)) {
+      const err = new Error(`Member ${mid} is not in this league`);
+      err.status = 400;
+      throw err;
+    }
+    if (seen.has(mid)) {
+      const err = new Error('Duplicate member ID in order');
+      err.status = 400;
+      throw err;
+    }
+    seen.add(mid);
+  }
+
+  if (orderedMemberIds.length !== members.length) {
+    const err = new Error(`Must include all ${members.length} members in the order`);
+    err.status = 400;
+    throw err;
+  }
+
+  await leagueModel.setMemberDraftOrder(leagueId, orderedMemberIds);
+  await leagueModel.update(leagueId, { custom_draft_order: true });
+
+  // Return updated members with positions
+  return leagueModel.findMembersByLeague(leagueId);
+}
+
 module.exports = {
   createLeague,
   joinLeague,
@@ -241,4 +299,5 @@ module.exports = {
   fillWithBots,
   leaveLeague,
   removeMemberByCommissioner,
+  setDraftOrder,
 };

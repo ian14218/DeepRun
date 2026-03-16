@@ -43,3 +43,8 @@ export async function removeMember(leagueId, userId) {
   const res = await api.delete(`/api/leagues/${leagueId}/members/${userId}`);
   return res.data;
 }
+
+export async function saveDraftOrder(leagueId, memberIds) {
+  const res = await api.put(`/api/leagues/${leagueId}/draft-order`, { memberIds });
+  return res.data;
+}

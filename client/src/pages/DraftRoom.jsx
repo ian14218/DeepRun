@@ -219,6 +219,10 @@ export default function DraftRoom() {
 
   // Pre-draft state
   if (draftState.status === 'pre_draft') {
+    const draftOrderMembers = league.custom_draft_order && league.members?.some((m) => m.draft_position)
+      ? [...league.members].sort((a, b) => (a.draft_position || 0) - (b.draft_position || 0))
+      : null;
+
     return (
       <div className="space-y-4">
         <h1 className="text-xl sm:text-2xl font-bold truncate">{league.name} — Draft Room</h1>
@@ -252,6 +256,27 @@ export default function DraftRoom() {
             )}
           </CardContent>
         </Card>
+
+        {/* Show draft order if commissioner has set one */}
+        {draftOrderMembers && (
+          <Card>
+            <CardContent className="p-4">
+              <h3 className="text-sm font-semibold mb-3">Draft Order</h3>
+              <ol className="space-y-1.5">
+                {draftOrderMembers.map((m, i) => (
+                  <li key={m.id} className="flex items-center gap-2 text-sm">
+                    <span className="font-bold text-muted-foreground w-6 text-center">{i + 1}</span>
+                    <span className={cn('font-medium', m.user_id === user.id && 'text-primary')}>
+                      {m.username}
+                      {m.user_id === user.id && ' (You)'}
+                    </span>
+                    {m.is_bot && <Badge variant="secondary" className="text-[10px]">CPU</Badge>}
+                  </li>
+                ))}
+              </ol>
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }

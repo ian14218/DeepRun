@@ -228,14 +228,21 @@ async function startDraft(leagueId, userId) {
     e.status = 400; throw e;
   }
 
-  // Randomly shuffle members to determine draft order (Fisher-Yates)
-  const shuffled = [...members];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  // Use custom draft order if commissioner set one, otherwise random shuffle
+  let assignments;
+  if (league.custom_draft_order && members.every((m) => m.draft_position != null)) {
+    // Commissioner already set positions — keep them
+    assignments = members.map((m) => ({ memberId: m.id, position: m.draft_position }));
+  } else {
+    // Randomly shuffle members to determine draft order (Fisher-Yates)
+    const shuffled = [...members];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    assignments = shuffled.map((m, i) => ({ memberId: m.id, position: i + 1 }));
+    await leagueModel.setMemberDraftPositions(assignments);
   }
-  const assignments = shuffled.map((m, i) => ({ memberId: m.id, position: i + 1 }));
-  await leagueModel.setMemberDraftPositions(assignments);
   await leagueModel.setDraftStatus(leagueId, 'in_progress');
 
   // Build the draft_order response: [{member_id, user_id, username, draft_position}]
