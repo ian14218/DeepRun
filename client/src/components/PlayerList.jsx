@@ -31,7 +31,6 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
     .filter((p) => {
       if (pickedPlayerIds.includes(p.id)) return false;
       if (p.is_eliminated || p.team_is_eliminated) return false;
-      if (p.injury_status === 'Out') return false;
       if ((p.season_ppg || 0) < 3) return false;
       if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
       if (teamFilter && p.team_name !== teamFilter) return false;
@@ -114,48 +113,51 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
         <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">
           <ScrollArea className="h-full">
             <div className="divide-y divide-border">
-              {visible.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between px-3 py-2 hover:bg-secondary/50 transition-colors gap-2"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-medium truncate">{p.name}</span>
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
-                        {p.position}
-                      </Badge>
-                      {p.injury_status === 'Out' && (
-                        <Badge variant="destructive" className="text-[10px] px-1 py-0 shrink-0">
-                          INJ
-                        </Badge>
-                      )}
-                      {p.is_first_four && (
-                        <Badge variant="secondary" className="text-[10px] px-1 py-0 shrink-0 bg-amber-500/15 text-amber-600 border-amber-500/30">
-                          FF
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                      <TeamLogo externalId={p.team_external_id} teamName={p.team_name} size={14} />
-                      <span className="truncate">{p.team_name}</span>
-                      <span className="shrink-0">#{p.seed}</span>
-                      {p.season_ppg > 0 && (
-                        <span className="shrink-0 font-semibold text-foreground">{p.season_ppg} PPG</span>
-                      )}
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant={canPick ? 'default' : 'ghost'}
-                    disabled={!canPick}
-                    onClick={() => handlePickClick(p)}
-                    className="shrink-0 h-7 text-xs px-2"
+              {visible.map((p) => {
+                const isInjured = p.injury_status === 'Out';
+                return (
+                  <div
+                    key={p.id}
+                    className={`flex items-center justify-between px-3 py-2 hover:bg-secondary/50 transition-colors gap-2 ${isInjured ? 'opacity-50' : ''}`}
                   >
-                    Pick
-                  </Button>
-                </div>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-medium truncate">{p.name}</span>
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                          {p.position}
+                        </Badge>
+                        {isInjured && (
+                          <Badge variant="destructive" className="text-[10px] px-1 py-0 shrink-0">
+                            OUT
+                          </Badge>
+                        )}
+                        {p.is_first_four && !isInjured && (
+                          <Badge variant="secondary" className="text-[10px] px-1 py-0 shrink-0 bg-amber-500/15 text-amber-600 border-amber-500/30">
+                            FF
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                        <TeamLogo externalId={p.team_external_id} teamName={p.team_name} size={14} />
+                        <span className="truncate">{p.team_name}</span>
+                        <span className="shrink-0">#{p.seed}</span>
+                        {p.season_ppg > 0 && (
+                          <span className="shrink-0 font-semibold text-foreground">{p.season_ppg} PPG</span>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={canPick && !isInjured ? 'default' : 'ghost'}
+                      disabled={!canPick || isInjured}
+                      onClick={() => handlePickClick(p)}
+                      className="shrink-0 h-7 text-xs px-2"
+                    >
+                      {isInjured ? 'Out' : 'Pick'}
+                    </Button>
+                  </div>
+                );
+              })}
               {visible.length === 0 && (
                 <div className="px-3 py-8 text-center text-sm text-muted-foreground">
                   No players found.

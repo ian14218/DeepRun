@@ -51,7 +51,7 @@ async function upsertPlayerPrice(contestId, playerId, price) {
 }
 
 async function getPlayerPrices(contestId, { search, minPrice, maxPrice, seed, sortBy, page = 1, limit = 50 } = {}) {
-  const conditions = ['bp.contest_id = $1', "COALESCE(p.injury_status, '') != 'Out'"];
+  const conditions = ['bp.contest_id = $1'];
   const values = [contestId];
   let idx = 2;
 
