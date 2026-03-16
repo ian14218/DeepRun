@@ -278,6 +278,19 @@ export default function LeagueDetail() {
         </div>
       )}
 
+      {/* Draft Order Setup (commissioner, pre-draft, league full) */}
+      {isCommissioner && league.draft_status === 'pre_draft' && (league.members?.length ?? 0) === league.team_count && (
+        <DraftOrderSetup
+          leagueId={id}
+          members={league.members}
+          customDraftOrder={league.custom_draft_order}
+          onOrderSaved={async () => {
+            const leagueData = await getLeague(id);
+            setLeague(leagueData);
+          }}
+        />
+      )}
+
       {/* Leave league (non-commissioner, pre-draft) */}
       {!isCommissioner && league.draft_status === 'pre_draft' && (
         <Button variant="outline" className="text-destructive" onClick={() => setShowLeaveDialog(true)}>
@@ -574,19 +587,6 @@ export default function LeagueDetail() {
             </CardContent>
           </Card>
         </div>
-      )}
-
-      {/* Draft Order Setup (commissioner, pre-draft, league full) */}
-      {isCommissioner && league.draft_status === 'pre_draft' && (league.members?.length ?? 0) === league.team_count && (
-        <DraftOrderSetup
-          leagueId={id}
-          members={league.members}
-          customDraftOrder={league.custom_draft_order}
-          onOrderSaved={async () => {
-            const leagueData = await getLeague(id);
-            setLeague(leagueData);
-          }}
-        />
       )}
 
       <Separator />
