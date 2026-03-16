@@ -2,6 +2,27 @@ const pool = require('../db');
 const bestBallModel = require('../models/bestBall.model');
 const pricingService = require('./bestBallPricing.service');
 
+// Round of 64 tip-off times (Eastern) by tournament year.
+// The lock date defaults to 30 minutes before the first R64 game so rosters
+// are locked before scoring begins (First Four games have no scoring impact).
+const R64_TIPOFF = {
+  2025: '2025-03-20T12:15:00-04:00',
+  2026: '2026-03-19T12:15:00-04:00',
+};
+
+function getLockDate() {
+  const year = new Date().getFullYear();
+  const tipoff = R64_TIPOFF[year];
+  if (tipoff) {
+    // Lock 30 minutes before first tip-off
+    return new Date(new Date(tipoff).getTime() - 30 * 60 * 1000);
+  }
+  // Fallback: 7 days from now
+  const fallback = new Date();
+  fallback.setDate(fallback.getDate() + 7);
+  return fallback;
+}
+
 function createError(message, status) {
   const err = new Error(message);
   err.status = status;
@@ -23,9 +44,8 @@ async function ensureActiveContest() {
   );
   if (rows[0].count === 0) return null;
 
-  // Auto-create an open contest
-  const lockDate = new Date();
-  lockDate.setDate(lockDate.getDate() + 7);
+  // Auto-create an open contest — lock before Round of 64 tip-off
+  const lockDate = getLockDate();
 
   const contest = await bestBallModel.createContest({
     name: 'March Madness Best Ball',
