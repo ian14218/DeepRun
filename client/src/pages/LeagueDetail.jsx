@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 import { getLeague, fillWithBots, updateLeague, leaveLeague, removeMember } from '../services/leagueService';
+import DraftOrderSetup from '../components/DraftOrderSetup';
 import { getStandings, getTeamRoster } from '../services/standingsService';
 import StandingsTable from '../components/StandingsTable';
 import PlayerRow from '../components/PlayerRow';
@@ -573,6 +574,19 @@ export default function LeagueDetail() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Draft Order Setup (commissioner, pre-draft, league full) */}
+      {isCommissioner && league.draft_status === 'pre_draft' && (league.members?.length ?? 0) === league.team_count && (
+        <DraftOrderSetup
+          leagueId={id}
+          members={league.members}
+          customDraftOrder={league.custom_draft_order}
+          onOrderSaved={async () => {
+            const leagueData = await getLeague(id);
+            setLeague(leagueData);
+          }}
+        />
       )}
 
       <Separator />

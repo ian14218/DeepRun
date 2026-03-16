@@ -40,6 +40,7 @@ async function findByUserId(userId) {
 const UPDATABLE_COLUMNS = new Set([
   'name', 'team_count', 'roster_size', 'draft_status',
   'draft_timer_seconds', 'timer_running', 'timer_remaining',
+  'custom_draft_order',
 ]);
 
 async function update(id, fields) {
@@ -109,6 +110,16 @@ async function setMemberDraftPositions(assignments) {
   }
 }
 
+// orderedMemberIds: array of member UUIDs in desired draft order (index 0 = position 1)
+async function setMemberDraftOrder(leagueId, orderedMemberIds) {
+  for (let i = 0; i < orderedMemberIds.length; i++) {
+    await pool.query(
+      `UPDATE league_members SET draft_position = $1 WHERE league_id = $2 AND id = $3`,
+      [i + 1, leagueId, orderedMemberIds[i]]
+    );
+  }
+}
+
 async function removeMember(leagueId, userId) {
   const result = await pool.query(
     `DELETE FROM league_members WHERE league_id = $1 AND user_id = $2 RETURNING *`,
@@ -129,5 +140,6 @@ module.exports = {
   getMemberCount,
   setDraftStatus,
   setMemberDraftPositions,
+  setMemberDraftOrder,
   removeMember,
 };
