@@ -126,18 +126,20 @@ async function fetchPlayerSeasonStats(externalPlayerId) {
     const statEntries = Object.values(statistics);
     let values = null;
 
-    // Look for the current season entry (e.g. "2025-26" for year 2026)
+    // Look for the current season entry — try multiple label formats
     const currentSeasonLabel = `${year - 1}-${String(year).slice(2)}`;
     const currentSeason = statEntries.find(
       (s) => s.displayName === currentSeasonLabel
+        || s.displayName === String(year)
+        || s.displayName === `${year - 1}-${year}`
     );
     if (currentSeason && currentSeason.stats && currentSeason.stats.length > 0) {
       values = currentSeason.stats;
     }
 
-    // Fallback: use the first statistics entry (most recent season)
+    // Fallback: use the last statistics entry (most recent season)
     if (!values && statEntries.length > 0) {
-      values = statEntries[0].stats;
+      values = statEntries[statEntries.length - 1].stats;
     }
 
     // Last resort: use totals (career aggregate)

@@ -265,14 +265,25 @@ async function refreshSeasonStats({ year = 2026 } = {}) {
       const statEntries = Object.values(statistics);
       let values = null;
 
-      // Current season first
-      const currentSeason = statEntries.find((s) => s.displayName === currentSeasonLabel);
+      // Log the first player's available seasons so we can see ESPN's format
+      if (updated === 0 && failed === 0 && statEntries.length > 0) {
+        const seasonNames = statEntries.map((s) => s.displayName);
+        console.log(`[refresh-stats] ESPN season labels for ${player.name}: ${JSON.stringify(seasonNames)}`);
+        console.log(`[refresh-stats] Looking for: "${currentSeasonLabel}"`);
+      }
+
+      // Current season first — try multiple label formats
+      const currentSeason = statEntries.find(
+        (s) => s.displayName === currentSeasonLabel
+          || s.displayName === String(year)
+          || s.displayName === `${year - 1}-${year}`
+      );
       if (currentSeason && currentSeason.stats && currentSeason.stats.length > 0) {
         values = currentSeason.stats;
       }
-      // Fallback: first entry (most recent season)
+      // Fallback: last entry (most recent season)
       if (!values && statEntries.length > 0) {
-        values = statEntries[0].stats;
+        values = statEntries[statEntries.length - 1].stats;
       }
       // Last resort: career totals
       if (!values || values.length === 0) {
