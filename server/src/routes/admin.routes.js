@@ -224,6 +224,45 @@ router.delete('/tournament/first-four-pairs/:teamId', async (req, res) => {
   }
 });
 
+// ─── Debug: preview ESPN stats structure for a player ────────────────────────
+
+router.get('/debug-espn-stats/:externalId', async (req, res) => {
+  try {
+    const axios = require('axios');
+    const resp = await axios.get(
+      `https://site.web.api.espn.com/apis/common/v3/sports/basketball/mens-college-basketball/athletes/${req.params.externalId}/stats`,
+      { timeout: 5000 }
+    );
+    const categories = resp.data.categories || [];
+    const averages = categories.find((c) => c.displayName === 'Season Averages');
+    if (!averages) return res.json({ error: 'No Season Averages category found', categories: categories.map((c) => c.displayName) });
+
+    const statistics = averages.statistics || {};
+    const entries = Object.entries(statistics).map(([key, val]) => ({
+      key,
+      displayName: val.displayName,
+      stats: val.stats,
+    }));
+
+    const labels = averages.labels;
+    const ptsIdx = labels ? labels.indexOf('PTS') : -1;
+
+    res.json({
+      labels,
+      totals: averages.totals,
+      totalsPPG: ptsIdx >= 0 && averages.totals ? averages.totals[ptsIdx] : null,
+      seasons: entries.map((e) => ({
+        key: e.key,
+        displayName: e.displayName,
+        ppg: ptsIdx >= 0 && e.stats ? e.stats[ptsIdx] : null,
+      })),
+      raw_statistics: statistics,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Refresh Season Stats from ESPN ──────────────────────────────────────────
 
 router.post('/refresh-stats', async (req, res) => {
