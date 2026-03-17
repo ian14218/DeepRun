@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { getAdminStats, getAdminTeams, getAdminPlayers, simulateTournamentRound, resetSimulation, getFirstFourPairs, createFirstFourPair, removeFirstFourPair, backfillSync, seedTournament, seedFirstFour, togglePlayerInjury } from '../../services/adminService';
+import { getAdminStats, getAdminTeams, getAdminPlayers, simulateTournamentRound, resetSimulation, getFirstFourPairs, createFirstFourPair, removeFirstFourPair, backfillSync, seedTournament, seedFirstFour, togglePlayerInjury, refreshSeasonStats } from '../../services/adminService';
 import { toast } from 'sonner';
 import TeamLogo from '../../components/TeamLogo';
 
@@ -38,6 +38,7 @@ export default function AdminTournament() {
   const [seedingFf, setSeedingFf] = useState(false);
   const [backfillDates, setBackfillDates] = useState('');
   const [backfilling, setBackfilling] = useState(false);
+  const [refreshingStats, setRefreshingStats] = useState(false);
 
   useEffect(() => {
     getAdminStats()
@@ -191,6 +192,18 @@ export default function AdminTournament() {
       toast.error(err.response?.data?.error || 'Backfill failed');
     } finally {
       setBackfilling(false);
+    }
+  }
+
+  async function handleRefreshStats() {
+    setRefreshingStats(true);
+    try {
+      const result = await refreshSeasonStats(seedYear);
+      toast.success(result.message);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Refresh failed');
+    } finally {
+      setRefreshingStats(false);
     }
   }
 
@@ -532,6 +545,22 @@ export default function AdminTournament() {
               <CardContent>
                 <Button onClick={handleSeedFirstFour} disabled={seedingFf}>
                   {seedingFf ? 'Seeding...' : 'Seed First Four'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Refresh Season Stats */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Refresh Season Stats</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Re-fetch current-season PPG, RPG, APG, etc. from ESPN for all players.
+                  Runs in the background — does not affect injury status or draft picks.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <Button onClick={handleRefreshStats} disabled={refreshingStats}>
+                  {refreshingStats ? 'Refreshing...' : 'Refresh Season Stats'}
                 </Button>
               </CardContent>
             </Card>
