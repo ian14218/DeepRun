@@ -8,8 +8,9 @@
  * Also sets the is_first_four flag and first_four_partner_id for each pair.
  *
  * Usage:
- *   node database/seed_first_four.js             # detect and seed First Four teams
- *   node database/seed_first_four.js --dry-run   # show detected teams without DB writes
+ *   node database/seed_first_four.js                    # detect and seed First Four teams
+ *   node database/seed_first_four.js --year 2026        # specify tournament year (for correct season stats)
+ *   node database/seed_first_four.js --dry-run          # show detected teams without DB writes
  */
 require('dotenv').config({ path: `${__dirname}/../server/.env` });
 const { Pool } = require('pg');
@@ -22,7 +23,10 @@ const ESPN_ROSTER_BASE =
 const ESPN_STATS_BASE =
   'https://site.web.api.espn.com/apis/common/v3/sports/basketball/mens-college-basketball';
 
-const dryRun = process.argv.includes('--dry-run');
+const args = process.argv.slice(2);
+const yearIdx = args.indexOf('--year');
+const year = yearIdx >= 0 ? parseInt(args[yearIdx + 1], 10) : 2026;
+const dryRun = args.includes('--dry-run');
 
 /**
  * Find First Four teams: teams that share the same (seed, region).
@@ -74,12 +78,24 @@ async function fetchAndSeedPlayers(teamId, externalId, teamName) {
       const averages = categories.find((c) => c.displayName === 'Season Averages');
       if (!averages) continue;
 
-      let values = averages.totals;
+      // ESPN nests per-season stats under statistics (e.g. "2025-26", "2024-25").
+      // 'totals' is the career aggregate — we want the current season instead.
+      const statistics = averages.statistics || {};
+      const statEntries = Object.values(statistics);
+      let values = null;
+
+      const currentSeasonLabel = `${year - 1}-${String(year).slice(2)}`;
+      const currentSeason = statEntries.find(
+        (s) => s.displayName === currentSeasonLabel
+      );
+      if (currentSeason && currentSeason.stats && currentSeason.stats.length > 0) {
+        values = currentSeason.stats;
+      }
+      if (!values && statEntries.length > 0) {
+        values = statEntries[0].stats;
+      }
       if (!values || values.length === 0) {
-        const statKeys = Object.keys(averages.statistics || {});
-        if (statKeys.length > 0) {
-          values = averages.statistics[statKeys[0]].stats;
-        }
+        values = averages.totals;
       }
       if (!values || values.length === 0) continue;
 

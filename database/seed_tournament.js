@@ -120,13 +120,29 @@ async function fetchPlayerSeasonStats(externalPlayerId) {
     const averages = categories.find((c) => c.displayName === 'Season Averages');
     if (!averages) return null;
 
-    // Stats can be in 'totals' (aggregate) or nested under statistics[key].stats
-    let values = averages.totals;
+    // ESPN nests per-season stats under statistics (e.g. "2025-26", "2024-25").
+    // 'totals' is the career aggregate — we want the current season instead.
+    const statistics = averages.statistics || {};
+    const statEntries = Object.values(statistics);
+    let values = null;
+
+    // Look for the current season entry (e.g. "2025-26" for year 2026)
+    const currentSeasonLabel = `${year - 1}-${String(year).slice(2)}`;
+    const currentSeason = statEntries.find(
+      (s) => s.displayName === currentSeasonLabel
+    );
+    if (currentSeason && currentSeason.stats && currentSeason.stats.length > 0) {
+      values = currentSeason.stats;
+    }
+
+    // Fallback: use the first statistics entry (most recent season)
+    if (!values && statEntries.length > 0) {
+      values = statEntries[0].stats;
+    }
+
+    // Last resort: use totals (career aggregate)
     if (!values || values.length === 0) {
-      const statKeys = Object.keys(averages.statistics || {});
-      if (statKeys.length > 0) {
-        values = averages.statistics[statKeys[0]].stats;
-      }
+      values = averages.totals;
     }
     if (!values || values.length === 0) return null;
 
