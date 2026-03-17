@@ -9,62 +9,76 @@ This spec adds a transactional email service and self-service password managemen
 3. **Admin Reset Notification** — Email users their temporary password when an admin resets it.
 4. **Welcome Email** — Confirmation email on registration.
 
-### Why Nodemailer + SMTP
+### Email Provider Strategy
 
 | Option | Pros | Cons | Verdict |
 |--------|------|------|---------|
-| **Nodemailer + SMTP** | Zero vendor lock-in, works with any provider, 5M+ weekly npm downloads, Ethereal for dev/test | Must manage templates yourself, deliverability depends on provider | **Selected** |
-| Resend SDK | Clean API, Railway-friendly, free tier 100/day | Vendor lock-in, extra dependency, overkill for ~100 users | Good alternative |
-| SendGrid SDK | Battle-tested, analytics dashboard | Complex setup, account approval delays, vendor lock-in | Over-engineered |
+| **Resend SDK (HTTPS API)** | Works on all Railway plans, 3K emails/month free (permanent), official Railway integration, clean API | Vendor-specific SDK, one extra dependency | **Primary — for Railway production** |
+| **Nodemailer + SMTP** | Zero vendor lock-in, works with any SMTP provider, 5M+ weekly npm downloads, Ethereal for dev/test | SMTP ports (587/465) blocked on Railway Free/Hobby plans | **Fallback — for non-Railway or Railway Pro** |
+| SendGrid SDK | Battle-tested, analytics dashboard | Killed free tier May 2025, complex setup, vendor lock-in | Not recommended |
 
-**Decision**: Use Nodemailer with SMTP transport. This keeps the implementation provider-agnostic — the operator configures SMTP credentials at deploy time (Resend SMTP, Gmail, Amazon SES, or any provider). Resend is the **recommended provider** for Railway deployments because they offer official Railway integration, a free tier of 100 emails/day (more than enough for ~100 users), and SMTP access via `smtp.resend.com:587`.
+**Decision**: Build a **dual-transport email service** that supports both the Resend HTTPS API and Nodemailer SMTP. The transport is selected by environment configuration:
+
+- **If `RESEND_API_KEY` is set** → Use the Resend SDK (HTTPS, works on all Railway plans).
+- **Else if `SMTP_HOST` is set** → Use Nodemailer SMTP transport (for self-hosted, Gmail, SES, etc.).
+- **Else** → Log emails to console (development mode).
+
+This gives Railway users a zero-friction path (Resend), while keeping the implementation provider-agnostic for operators who prefer their own SMTP.
 
 ### Railway Production Considerations
 
-- **No native email service** — Railway does not provide built-in email sending. All email goes through external SMTP providers.
-- **Outbound SMTP works** — Railway does not block ports 587 or 465. Standard SMTP connections work without configuration.
-- **Credentials via env vars** — Railway's built-in environment variable system stores SMTP secrets securely. No secrets manager needed for this scale.
-- **No email queue needed** — At ~100 users, email volume is trivially low (a few per day at most). Sending synchronously in the request handler is fine. A Bull/Redis queue would be over-engineering. Email sends are fire-and-forget (don't block the HTTP response on SMTP success).
-- **Graceful degradation** — If SMTP is not configured, the email service logs the email to console instead of crashing. This allows local development without SMTP setup and prevents the app from breaking if email credentials expire in production.
+- **No native email service** — Railway does not provide built-in email sending. All email goes through external providers.
+- **SMTP ports are blocked** — Railway blocks outbound SMTP (ports 25, 465, 587) on Free, Trial, and Hobby plans. Only Pro plan allows SMTP. This is why the Resend HTTPS API is the recommended transport — it uses standard HTTPS (port 443) which works on all plans.
+- **Resend free tier** — 3,000 emails/month permanently. For ~100 users sending password resets, admin notifications, and welcome emails, this is more than sufficient (estimated <100 emails/month).
+- **Credentials via env vars** — Railway's built-in environment variable system stores API keys securely. Set `RESEND_API_KEY` in Railway's dashboard.
+- **Domain verification** — Resend requires verifying your sending domain (SPF/DKIM DNS records) to send from a custom address. For development/testing, Resend provides a shared `onboarding@resend.dev` sender.
+- **No email queue needed** — At ~100 users, email volume is trivially low (a few per day at most). Sending synchronously in the request handler is fine. A Bull/Redis queue would be over-engineering. Email sends are fire-and-forget (don't block the HTTP response on send success).
+- **Graceful degradation** — If neither `RESEND_API_KEY` nor `SMTP_HOST` is configured, the email service logs the email to console instead of crashing. This allows local development without any email setup and prevents the app from breaking if credentials expire in production.
 
 ---
 
 ## 2. Dependencies
 
-### New npm Package
+### New npm Packages
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `nodemailer` | `^6.9.0` | SMTP email transport |
+| `resend` | `^4.0.0` | Resend HTTPS email API (primary transport for Railway) |
+| `nodemailer` | `^6.9.0` | SMTP email transport (fallback for non-Railway deployments) |
 
-**Install**: `cd server && npm install nodemailer`
+**Install**: `cd server && npm install resend nodemailer`
 
-No other new dependencies. The `crypto` module used for token generation is built into Node.js.
+The `crypto` module used for token generation is built into Node.js (no install needed).
 
 ### New Environment Variables
 
 Add to `server/.env.example`:
 
 ```
-# Email (optional — logs to console if not configured)
+# Email — configure ONE of the two transports (or neither for console logging)
+# Option 1: Resend API (recommended for Railway — works on all plans)
+RESEND_API_KEY=
+# Option 2: SMTP (for self-hosted, Gmail, SES — requires Railway Pro for SMTP ports)
 SMTP_HOST=
 SMTP_PORT=587
 SMTP_USER=
 SMTP_PASS=
-SMTP_FROM=DeepRun <noreply@yourdomain.com>
+# Shared config
+EMAIL_FROM=DeepRun <noreply@yourdomain.com>
 APP_URL=http://localhost:5173
 ```
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `SMTP_HOST` | No | SMTP server hostname (e.g., `smtp.resend.com`, `smtp.gmail.com`) |
+| `RESEND_API_KEY` | No | Resend API key. If set, uses Resend HTTPS API (recommended for Railway). |
+| `SMTP_HOST` | No | SMTP server hostname (e.g., `smtp.gmail.com`). Used only if `RESEND_API_KEY` is not set. |
 | `SMTP_PORT` | No | SMTP port. Default `587`. Use `465` for implicit TLS. |
-| `SMTP_USER` | No | SMTP username or API key (for Resend, use `resend` as username) |
-| `SMTP_PASS` | No | SMTP password or API key value |
-| `SMTP_FROM` | No | Sender address. Default `DeepRun <noreply@deeprun.app>` |
+| `SMTP_USER` | No | SMTP username |
+| `SMTP_PASS` | No | SMTP password |
+| `EMAIL_FROM` | No | Sender address. Default `DeepRun <noreply@deeprun.app>` |
 | `APP_URL` | No | Base URL for links in emails. Default `http://localhost:5173` |
 
-**If `SMTP_HOST` is falsy, the email service operates in "log mode" — it logs the email subject, recipient, and body to console instead of sending. This is the default for local development.**
+**Transport selection priority**: `RESEND_API_KEY` > `SMTP_HOST` > console logging. If neither is set, the email service operates in "log mode" — it logs the email subject, recipient, and body to console instead of sending. This is the default for local development.
 
 ---
 
@@ -103,13 +117,13 @@ CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens (user_id
 
 **File**: `server/src/services/email.service.js`
 
-The email service is a thin wrapper around Nodemailer that all other features call. It handles transport creation, template rendering, and graceful degradation.
+The email service is a dual-transport wrapper that supports both the Resend HTTPS API and Nodemailer SMTP. All other features call this service — they never interact with transports directly. It handles transport selection, template rendering, and graceful degradation.
 
 #### Architecture
 
 ```
 email.service.js
-├── createTransport()        — Builds Nodemailer transport (or null if SMTP unconfigured)
+├── initTransport()          — Selects transport: Resend API > Nodemailer SMTP > null (console)
 ├── sendEmail(to, subject, html) — Core send function with graceful fallback
 ├── sendPasswordReset(email, username, resetUrl)    — Forgot password template
 ├── sendAdminResetNotification(email, username, temporaryPassword) — Admin reset template
@@ -118,32 +132,68 @@ email.service.js
 
 #### Behavior
 
-1. **On module load**: Check if `SMTP_HOST` is set. If yes, create a Nodemailer SMTP transport. If no, set transport to `null`.
-2. **`sendEmail(to, subject, html)`**: If transport is `null`, log the email details to console and return `{ sent: false, logged: true }`. If transport exists, call `transport.sendMail()`. On SMTP failure, log the error and return `{ sent: false, error }` — never throw. Callers must not crash on email failure.
+1. **On module load**: Select transport based on environment:
+   - If `RESEND_API_KEY` is set → create a Resend client.
+   - Else if `SMTP_HOST` is set → create a Nodemailer SMTP transport.
+   - Else → set transport to `null` (console log mode).
+2. **`sendEmail(to, subject, html)`**: If transport is `null`, log the email details to console and return `{ sent: false, logged: true }`. If Resend, call `resend.emails.send()`. If Nodemailer, call `transport.sendMail()`. On any send failure, log the error and return `{ sent: false, error }` — never throw. Callers must not crash on email failure.
 3. **Template functions**: Each builds an HTML string and calls `sendEmail()`. Templates use inline CSS (no external stylesheet dependency). All user-supplied values (username, etc.) must be HTML-escaped to prevent injection.
 
-#### SMTP Configuration
+#### Transport Configuration
 
 ```javascript
-// Port 465 = implicit TLS (secure: true)
-// Port 587 = STARTTLS (secure: false, Nodemailer upgrades automatically)
-const secure = parseInt(process.env.SMTP_PORT) === 465;
+const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
-const transport = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT) || 587,
-  secure,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+let transport = null;
+let transportType = 'console'; // 'resend' | 'smtp' | 'console'
+
+if (process.env.RESEND_API_KEY) {
+  transport = new Resend(process.env.RESEND_API_KEY);
+  transportType = 'resend';
+} else if (process.env.SMTP_HOST) {
+  const secure = parseInt(process.env.SMTP_PORT) === 465;
+  transport = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+  transportType = 'smtp';
+}
+```
+
+#### `sendEmail()` Implementation
+
+```javascript
+async function sendEmail(to, subject, html) {
+  const from = process.env.EMAIL_FROM || 'DeepRun <noreply@deeprun.app>';
+
+  if (transportType === 'console') {
+    console.log(`[email] To: ${to} | Subject: ${subject}`);
+    console.log(`[email] Body: ${html}`);
+    return { sent: false, logged: true };
+  }
+
+  try {
+    if (transportType === 'resend') {
+      await transport.emails.send({ from, to, subject, html });
+    } else {
+      await transport.sendMail({ from, to, subject, html });
+    }
+    return { sent: true };
+  } catch (error) {
+    console.error(`[email] Failed to send to ${to}:`, error.message);
+    return { sent: false, error: error.message };
+  }
+}
 ```
 
 #### Acceptance Criteria
 
-- AC-EMAIL-1: When `SMTP_HOST` is configured, `sendEmail()` sends via SMTP and returns `{ sent: true }`.
-- AC-EMAIL-2: When `SMTP_HOST` is not configured, `sendEmail()` logs to console and returns `{ sent: false, logged: true }`.
+- AC-EMAIL-1: When `RESEND_API_KEY` is configured, `sendEmail()` sends via Resend HTTPS API and returns `{ sent: true }`.
+- AC-EMAIL-1b: When `SMTP_HOST` is configured (and no `RESEND_API_KEY`), `sendEmail()` sends via SMTP and returns `{ sent: true }`.
+- AC-EMAIL-2: When neither `RESEND_API_KEY` nor `SMTP_HOST` is configured, `sendEmail()` logs to console and returns `{ sent: false, logged: true }`.
 - AC-EMAIL-3: When SMTP send fails (network error, bad credentials), `sendEmail()` logs the error and returns `{ sent: false, error }` — it never throws.
 - AC-EMAIL-4: User-supplied values in email templates are HTML-escaped.
 - AC-EMAIL-5: All template functions (`sendPasswordReset`, `sendAdminResetNotification`, `sendWelcome`) call `sendEmail()` and return its result.
@@ -152,12 +202,16 @@ const transport = nodemailer.createTransport({
 
 **File**: `server/tests/email.test.js`
 
-All tests mock Nodemailer's `createTransport` — no real SMTP connections in tests.
+All tests mock both Resend SDK and Nodemailer's `createTransport` — no real API calls or SMTP connections in tests. Use `jest.mock('resend')` and `jest.mock('nodemailer')`.
 
-- `sendEmail()` with SMTP configured calls `transport.sendMail` with correct `to`, `subject`, `html`, and `from` fields.
-- `sendEmail()` with SMTP configured returns `{ sent: true }` on success.
-- `sendEmail()` with SMTP not configured (no `SMTP_HOST`) logs to console and returns `{ sent: false, logged: true }`.
+- `sendEmail()` with `RESEND_API_KEY` configured calls `resend.emails.send()` with correct `from`, `to`, `subject`, `html` fields.
+- `sendEmail()` with `RESEND_API_KEY` configured returns `{ sent: true }` on success.
+- `sendEmail()` with `SMTP_HOST` configured (no `RESEND_API_KEY`) calls `transport.sendMail` with correct fields.
+- `sendEmail()` with `SMTP_HOST` configured returns `{ sent: true }` on success.
+- `sendEmail()` with neither configured logs to console and returns `{ sent: false, logged: true }`.
+- `sendEmail()` when Resend API rejects returns `{ sent: false, error }` and does not throw.
 - `sendEmail()` when `transport.sendMail` rejects returns `{ sent: false, error }` and does not throw.
+- `RESEND_API_KEY` takes precedence over `SMTP_HOST` when both are set.
 - `sendPasswordReset()` produces HTML containing the reset URL and username.
 - `sendAdminResetNotification()` produces HTML containing the temporary password and username.
 - `sendWelcome()` produces HTML containing the username.
@@ -611,7 +665,7 @@ password_reset_tokens
 
 | File | Change |
 |------|--------|
-| `server/package.json` | Add `nodemailer` dependency |
+| `server/package.json` | Add `resend` and `nodemailer` dependencies |
 | `server/.env.example` | Add SMTP + APP_URL variables |
 | `server/src/services/auth.service.js` | Add `forgotPassword()`, `resetPassword()`, welcome email call in `register()` |
 | `server/src/routes/auth.routes.js` | Add `POST /forgot-password` and `POST /reset-password` routes |
@@ -638,11 +692,11 @@ Follow this order to build each piece test-first. Each phase is independently sh
 
 ### Phase 2: Email Service (Test-First)
 
-1. Install nodemailer: `cd server && npm install nodemailer`.
-2. Write `server/tests/email.test.js` with all email service tests (mocked transport).
-3. Create `server/src/services/email.service.js`.
+1. Install dependencies: `cd server && npm install resend nodemailer`.
+2. Write `server/tests/email.test.js` with all email service tests (mock both Resend SDK and Nodemailer).
+3. Create `server/src/services/email.service.js` with dual-transport support.
 4. Run tests — all email tests pass.
-5. Update `server/.env.example` with SMTP + APP_URL variables.
+5. Update `server/.env.example` with `RESEND_API_KEY`, SMTP, `EMAIL_FROM`, and `APP_URL` variables.
 
 ### Phase 3: Forgot/Reset Password Backend (Test-First)
 
@@ -688,17 +742,18 @@ After implementation, add these entries to `CLAUDE.md`:
 
 ### Environment Variables section
 ```
-- `SMTP_HOST` — SMTP server hostname (optional, logs to console if not set)
+- `RESEND_API_KEY` — Resend API key (recommended for Railway, uses HTTPS API)
+- `SMTP_HOST` — SMTP server hostname (fallback, requires Railway Pro for SMTP ports)
 - `SMTP_PORT` — SMTP port (default 587)
-- `SMTP_USER` — SMTP username/API key
+- `SMTP_USER` — SMTP username
 - `SMTP_PASS` — SMTP password
-- `SMTP_FROM` — Sender email address
+- `EMAIL_FROM` — Sender email address
 - `APP_URL` — Base URL for email links (default http://localhost:5173)
 ```
 
 ### Architecture > Backend section
 ```
-- `services/email.service.js` — Nodemailer SMTP transport with graceful degradation, email templates
+- `services/email.service.js` — Dual-transport email (Resend API or Nodemailer SMTP) with graceful degradation, email templates
 - `models/passwordResetToken.model.js` — Password reset token CRUD (SHA-256 hashed tokens)
 ```
 
