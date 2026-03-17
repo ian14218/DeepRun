@@ -85,10 +85,10 @@ async function fetchAndSeedPlayers(teamId, externalId, teamName) {
       let values = null;
 
       const currentSeasonLabel = `${year - 1}-${String(year).slice(2)}`;
+      const getLabel = (s) => (s.season && s.season.displayName) || s.displayName || '';
       const currentSeason = statEntries.find(
-        (s) => s.displayName === currentSeasonLabel
-          || s.displayName === String(year)
-          || s.displayName === `${year - 1}-${year}`
+        (s) => getLabel(s) === currentSeasonLabel
+          || (s.season && s.season.year === year)
       );
       if (currentSeason && currentSeason.stats && currentSeason.stats.length > 0) {
         values = currentSeason.stats;

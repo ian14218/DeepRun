@@ -267,16 +267,16 @@ async function refreshSeasonStats({ year = 2026 } = {}) {
 
       // Log the first player's available seasons so we can see ESPN's format
       if (updated === 0 && failed === 0 && statEntries.length > 0) {
-        const seasonNames = statEntries.map((s) => s.displayName);
+        const seasonNames = statEntries.map((s) => (s.season && s.season.displayName) || s.displayName);
         console.log(`[refresh-stats] ESPN season labels for ${player.name}: ${JSON.stringify(seasonNames)}`);
-        console.log(`[refresh-stats] Looking for: "${currentSeasonLabel}"`);
+        console.log(`[refresh-stats] Looking for: "${currentSeasonLabel}" or year=${year}`);
       }
 
-      // Current season first — try multiple label formats
+      // Current season first — ESPN nests label under season.displayName or top-level
+      const getLabel = (s) => (s.season && s.season.displayName) || s.displayName || '';
       const currentSeason = statEntries.find(
-        (s) => s.displayName === currentSeasonLabel
-          || s.displayName === String(year)
-          || s.displayName === `${year - 1}-${year}`
+        (s) => getLabel(s) === currentSeasonLabel
+          || (s.season && s.season.year === year)
       );
       if (currentSeason && currentSeason.stats && currentSeason.stats.length > 0) {
         values = currentSeason.stats;
