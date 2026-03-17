@@ -237,4 +237,72 @@ async function resetSimulation({ includeDrafts = false } = {}) {
   return result;
 }
 
-module.exports = { getStats, getAllLeagues, getLeagueDetail, deleteLeague, resetDraft, resetSimulation, getTournamentTeams, getTournamentPlayers };
+async function refreshSeasonStats({ year = 2026 } = {}) {
+  const axios = require('axios');
+  const ESPN_STATS_BASE =
+    'https://site.web.api.espn.com/apis/common/v3/sports/basketball/mens-college-basketball';
+
+  // Get all players with an external_id
+  const { rows: players } = await pool.query(
+    `SELECT id, external_id, name FROM players WHERE external_id IS NOT NULL ORDER BY season_ppg DESC NULLS LAST`
+  );
+
+  const currentSeasonLabel = `${year - 1}-${String(year).slice(2)}`;
+  let updated = 0;
+  let failed = 0;
+
+  for (const player of players) {
+    try {
+      const resp = await axios.get(
+        `${ESPN_STATS_BASE}/athletes/${player.external_id}/stats`,
+        { timeout: 5000 }
+      );
+      const categories = resp.data.categories || [];
+      const averages = categories.find((c) => c.displayName === 'Season Averages');
+      if (!averages) { failed++; continue; }
+
+      const statistics = averages.statistics || {};
+      const statEntries = Object.values(statistics);
+      let values = null;
+
+      // Current season first
+      const currentSeason = statEntries.find((s) => s.displayName === currentSeasonLabel);
+      if (currentSeason && currentSeason.stats && currentSeason.stats.length > 0) {
+        values = currentSeason.stats;
+      }
+      // Fallback: first entry (most recent season)
+      if (!values && statEntries.length > 0) {
+        values = statEntries[0].stats;
+      }
+      // Last resort: career totals
+      if (!values || values.length === 0) {
+        values = averages.totals;
+      }
+      if (!values || values.length === 0) { failed++; continue; }
+
+      const labels = averages.labels || [];
+      const get = (label) => {
+        const idx = labels.indexOf(label);
+        return idx >= 0 ? parseFloat(values[idx]) || 0 : 0;
+      };
+
+      await pool.query(
+        `UPDATE players
+         SET season_ppg = $1, season_rpg = $2, season_apg = $3,
+             season_spg = $4, season_bpg = $5, season_mpg = $6, season_gp = $7
+         WHERE id = $8`,
+        [get('PTS'), get('REB'), get('AST'), get('STL'), get('BLK'), get('MIN'), Math.round(get('GP')), player.id]
+      );
+      updated++;
+    } catch {
+      failed++;
+    }
+
+    // Small delay to avoid ESPN rate limiting
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
+  return { total: players.length, updated, failed };
+}
+
+module.exports = { getStats, getAllLeagues, getLeagueDetail, deleteLeague, resetDraft, resetSimulation, getTournamentTeams, getTournamentPlayers, refreshSeasonStats };

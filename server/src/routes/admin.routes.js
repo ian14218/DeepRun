@@ -224,6 +224,23 @@ router.delete('/tournament/first-four-pairs/:teamId', async (req, res) => {
   }
 });
 
+// ─── Refresh Season Stats from ESPN ──────────────────────────────────────────
+
+router.post('/refresh-stats', async (req, res) => {
+  try {
+    const { year = 2026 } = req.body;
+    // Run in background so the request returns immediately
+    adminService.refreshSeasonStats({ year }).then((result) => {
+      console.log(`[admin] Season stats refresh complete:`, result);
+    }).catch((err) => {
+      console.error(`[admin] Season stats refresh error:`, err.message);
+    });
+    res.json({ message: `Season stats refresh started for ${year - 1}-${String(year).slice(2)}. Check server logs for progress.` });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 // ─── Stat Sync Backfill ─────────────────────────────────────────────────────
 
 router.post('/sync/backfill', async (req, res) => {

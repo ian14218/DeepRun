@@ -79,3 +79,7 @@ export function seedFirstFour() {
 export function togglePlayerInjury(playerId, injuryStatus) {
   return api.patch(`/api/admin/tournament/players/${playerId}/injury`, { injury_status: injuryStatus }).then((r) => r.data);
 }
+
+export function refreshSeasonStats(year = 2026) {
+  return api.post('/api/admin/refresh-stats', { year }).then((r) => r.data);
+}
