@@ -38,14 +38,15 @@ async function createTestTeam(overrides = {}) {
     is_eliminated: false,
     wins: 0,
     external_id: `ext-team-${teamCounter}`,
+    is_first_four: false,
   };
   const data = { ...defaults, ...overrides };
 
   const result = await pool.query(
-    `INSERT INTO tournament_teams (name, seed, region, is_eliminated, wins, external_id)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO tournament_teams (name, seed, region, is_eliminated, wins, external_id, is_first_four)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
-    [data.name, data.seed, data.region, data.is_eliminated, data.wins, data.external_id]
+    [data.name, data.seed, data.region, data.is_eliminated, data.wins, data.external_id, data.is_first_four]
   );
   return result.rows[0];
 }

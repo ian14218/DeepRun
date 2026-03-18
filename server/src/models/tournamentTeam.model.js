@@ -12,7 +12,10 @@ const ROUND_BY_WINS = {
 };
 
 function addCurrentRound(team) {
-  return { ...team, current_round: ROUND_BY_WINS[team.wins] || 'Round of 64' };
+  // First Four winners get +1 win from the play-in that doesn't count for
+  // bracket advancement. Offset so current_round reflects tournament progress.
+  const effectiveWins = team.is_first_four ? Math.max(0, team.wins - 1) : team.wins;
+  return { ...team, current_round: ROUND_BY_WINS[effectiveWins] || 'Round of 64' };
 }
 
 async function findAll() {
@@ -70,7 +73,7 @@ async function updateWinsFromStats(id) {
        FROM player_game_stats pgs
        JOIN players p ON p.id = pgs.player_id
        WHERE p.team_id = $1
-     )
+     ) + CASE WHEN is_first_four AND NOT is_eliminated THEN 1 ELSE 0 END
      WHERE id = $1
      RETURNING *`,
     [id]

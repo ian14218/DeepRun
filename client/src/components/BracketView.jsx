@@ -79,8 +79,12 @@ function buildRegionRounds(teams) {
     const next = [];
     for (let i = 0; i < prev.length; i += 2) {
       const a = prev[i], b = prev[i + 1];
-      if (a && a.wins >= r) next.push(a);
-      else if (b && b.wins >= r) next.push(b);
+      // First Four winners get +1 win from the play-in that doesn't count
+      // for bracket advancement (it gets them INTO R64, not past it).
+      const aWins = a ? a.wins - (a.is_first_four ? 1 : 0) : 0;
+      const bWins = b ? b.wins - (b.is_first_four ? 1 : 0) : 0;
+      if (a && aWins >= r) next.push(a);
+      else if (b && bWins >= r) next.push(b);
       else next.push(null);
     }
     rounds.push(next);
@@ -88,12 +92,17 @@ function buildRegionRounds(teams) {
   return rounds;
 }
 
+function effectiveWins(team) {
+  if (!team) return 0;
+  return team.wins - (team.is_first_four ? 1 : 0);
+}
+
 function buildFinalRounds(regionRounds) {
   const winner = (region) => {
     const e8 = regionRounds[region]?.[3];
     if (!e8) return null;
-    if (e8[0]?.wins >= 4) return e8[0];
-    if (e8[1]?.wins >= 4) return e8[1];
+    if (e8[0] && effectiveWins(e8[0]) >= 4) return e8[0];
+    if (e8[1] && effectiveWins(e8[1]) >= 4) return e8[1];
     return null;
   };
 
@@ -101,12 +110,12 @@ function buildFinalRounds(regionRounds) {
 
   const champ = [];
   for (let i = 0; i < 4; i += 2) {
-    if (ff[i]?.wins >= 5) champ.push(ff[i]);
-    else if (ff[i + 1]?.wins >= 5) champ.push(ff[i + 1]);
+    if (effectiveWins(ff[i]) >= 5) champ.push(ff[i]);
+    else if (effectiveWins(ff[i + 1]) >= 5) champ.push(ff[i + 1]);
     else champ.push(null);
   }
 
-  const champion = champ[0]?.wins >= 6 ? champ[0] : champ[1]?.wins >= 6 ? champ[1] : null;
+  const champion = effectiveWins(champ[0]) >= 6 ? champ[0] : effectiveWins(champ[1]) >= 6 ? champ[1] : null;
   return { ff, champ, champion };
 }
 
@@ -438,6 +447,9 @@ function FirstFourSection({ teams, draftedCountByTeam }) {
 }
 
 // ── Main bracket layout ────────────────────────────────────────
+
+// Exported for testing
+export { buildRegionRounds, buildFinalRounds };
 
 export default function BracketView({ teams, draftedCountByTeam = {} }) {
   const byRegion = {};

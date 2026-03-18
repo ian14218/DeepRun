@@ -98,12 +98,16 @@ function buildBracketMatchups(allTeams, roundNum) {
       // Filter out eliminated teams when building seed map
       (byRegion[region] || []).filter((t) => !t.is_eliminated).forEach((t) => { bySeed[t.seed] = t; });
 
-      // Determine R64 winners in bracket order
+      // Determine R64 winners in bracket order.
+      // First Four winners get +1 win from the play-in that doesn't count
+      // for bracket advancement — offset so thresholds work correctly.
+      const ew = (t) => t ? t.wins - (t.is_first_four ? 1 : 0) : 0;
+
       let bracketSlots = R64_SEED_MATCHUPS.map(([seedA, seedB]) => {
         const teamA = bySeed[seedA];
         const teamB = bySeed[seedB];
-        if (teamA && teamA.wins >= 1) return teamA;
-        if (teamB && teamB.wins >= 1) return teamB;
+        if (teamA && ew(teamA) >= 1) return teamA;
+        if (teamB && ew(teamB) >= 1) return teamB;
         return null;
       });
 
@@ -113,8 +117,8 @@ function buildBracketMatchups(allTeams, roundNum) {
         for (let i = 0; i < bracketSlots.length; i += 2) {
           const a = bracketSlots[i];
           const b = bracketSlots[i + 1];
-          if (a && a.wins >= r) next.push(a);
-          else if (b && b.wins >= r) next.push(b);
+          if (a && ew(a) >= r) next.push(a);
+          else if (b && ew(b) >= r) next.push(b);
           else next.push(null);
         }
         bracketSlots = next;
@@ -243,12 +247,16 @@ async function simulateRound() {
     });
   }
 
-  // Update Best Ball: auto-transition open→live and update scores
+  // Update Best Ball: auto-transition open→live when lock_date has passed, then update scores
   try {
     const contest = await bestBallModel.getActiveContest();
     if (contest) {
       if (contest.status === 'open') {
-        await bestBallModel.updateContestStatus(contest.id, 'live');
+        const now = new Date();
+        const lockDate = contest.lock_date ? new Date(contest.lock_date) : null;
+        if (lockDate && now >= lockDate) {
+          await bestBallModel.updateContestStatus(contest.id, 'live');
+        }
       }
       if (['open', 'locked', 'live'].includes(contest.status)) {
         await bestBallService.updateScores(contest.id);
