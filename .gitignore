@@ -30,3 +30,5 @@ Thumbs.db
 
 # Local files
 *.local
+*.local.json
+repomix-output.xml

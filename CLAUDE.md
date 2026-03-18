@@ -149,6 +149,30 @@ All routes are mounted under `/api/` in `app.js`:
 
 Configured for Railway via `railway.json`. Server serves `client/dist/` for SPA routing. Graceful shutdown handles SIGTERM/SIGINT. See `server/.env.production.example` for required variables.
 
+### Railway CLI
+
+The Railway CLI (`railway`) is installed and linked to the DeepRun project. Use it for production database queries and debugging.
+
+```bash
+# Switch to the app service (default)
+railway service deeprun-app
+
+# View environment variables for the current service
+railway vars
+
+# Switch to the Postgres service to check DB vars
+railway service Postgres && railway vars
+
+# Connect to production DB via Node (no psql installed locally)
+node -e "
+const { Pool } = require('pg');
+const pool = new Pool({ connectionString: 'YOUR_PUBLIC_DB_URL', ssl: { rejectUnauthorized: false } });
+pool.query('SELECT ...').then(r => { console.table(r.rows); pool.end(); });
+"
+```
+
+**Important:** The server's `DATABASE_URL` uses Railway's internal hostname (`postgres.railway.internal`). If the database password is rotated, you must manually update `DATABASE_URL` on the server service to match. The public connection URL (with `proxy.rlwy.net`) is for external access only — never commit it or share it in plaintext.
+
 ### Tournament Seeding (March 15+)
 
 1. Confirm R64 dates in `database/seed_tournament.js` (`R64_DATES[2026]`)
