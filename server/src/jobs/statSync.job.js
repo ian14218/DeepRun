@@ -48,6 +48,7 @@ async function runSyncJob() {
 
 async function processGame(game) {
   const boxScore = await externalApi.fetchGameBoxScore(game.external_game_id, game.tournament_round);
+  const isFirstFour = boxScore.tournament_round === 'First Four';
 
   // Build a map of external_team_id → internal team record so we can resolve
   // opponent_team_id for each player's stat entry.
@@ -57,26 +58,29 @@ async function processGame(game) {
     if (team) teamRecords[teamData.external_team_id] = team;
   }
 
-  // Upsert stats for each player in each team
-  for (const teamData of boxScore.teams) {
-    const opponentExternalId = boxScore.teams
-      .map((t) => t.external_team_id)
-      .find((id) => id !== teamData.external_team_id);
+  // Upsert stats for each player in each team.
+  // First Four play-in games have no scoring impact — skip stat insertion.
+  if (!isFirstFour) {
+    for (const teamData of boxScore.teams) {
+      const opponentExternalId = boxScore.teams
+        .map((t) => t.external_team_id)
+        .find((id) => id !== teamData.external_team_id);
 
-    const opponentTeam = opponentExternalId ? teamRecords[opponentExternalId] : null;
+      const opponentTeam = opponentExternalId ? teamRecords[opponentExternalId] : null;
 
-    for (const playerData of teamData.players) {
-      const player = await playerModel.findByExternalId(playerData.external_player_id);
-      if (!player) continue;
+      for (const playerData of teamData.players) {
+        const player = await playerModel.findByExternalId(playerData.external_player_id);
+        if (!player) continue;
 
-      await playerGameStats.create(
-        player.id,
-        boxScore.game_date,
-        opponentTeam ? opponentTeam.id : null,
-        playerData.points,
-        boxScore.tournament_round,
-        game.external_game_id
-      );
+        await playerGameStats.create(
+          player.id,
+          boxScore.game_date,
+          opponentTeam ? opponentTeam.id : null,
+          playerData.points,
+          boxScore.tournament_round,
+          game.external_game_id
+        );
+      }
     }
   }
 
@@ -92,24 +96,29 @@ async function processGame(game) {
     if (game.winner_external_id) {
       const winnerTeam = await teamModel.findByExternalId(game.winner_external_id);
       if (winnerTeam) {
-        // Use stat-derived count (idempotent) rather than wins + 1 (would
-        // double-count on every subsequent sync after the game is final).
-        await teamModel.updateWinsFromStats(winnerTeam.id);
+        if (isFirstFour) {
+          // Direct win update for FF (no stats to derive from)
+          await teamModel.updateWins(winnerTeam.id, 1);
+        } else {
+          // Use stat-derived count (idempotent) rather than wins + 1 (would
+          // double-count on every subsequent sync after the game is final).
+          await teamModel.updateWinsFromStats(winnerTeam.id);
+        }
       }
     }
   }
 
-  // Auto-transition Best Ball contest to 'live' when the first non-First-Four
-  // game is processed (Round of 64+). First Four play-in games should NOT lock
-  // rosters — users can still draft and build rosters during the First Four.
+  // Auto-transition Best Ball contest to 'live' when the lock date has passed.
+  // The lock_date is set to 30 min before R64 tip-off, so First Four games
+  // (played days earlier) will never trigger this.
   try {
     const activeContest = await bestBallModel.getActiveContest();
     if (activeContest) {
-      if (activeContest.status === 'open' && game.status !== 'upcoming') {
-        const teamsInGame = Object.values(teamRecords);
-        const isFirstFourGame = teamsInGame.length === 2 && teamsInGame.every(t => t.is_first_four);
-        if (!isFirstFourGame) {
-          console.log('[statSync] First tournament game detected — locking Best Ball contest');
+      if (activeContest.status === 'open') {
+        const now = new Date();
+        const lockDate = activeContest.lock_date ? new Date(activeContest.lock_date) : null;
+        if (lockDate && now >= lockDate) {
+          console.log('[statSync] Lock date reached — locking Best Ball contest');
           await bestBallModel.updateContestStatus(activeContest.id, 'live');
         }
       }
