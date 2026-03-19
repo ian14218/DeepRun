@@ -50,6 +50,17 @@ async function processGame(game) {
   const boxScore = await externalApi.fetchGameBoxScore(game.external_game_id, game.tournament_round);
   const isFirstFour = boxScore.tournament_round === 'First Four';
 
+  // Detect suspicious all-zero box scores for final games (ESPN API quirk
+  // when games transition status — can return empty/zero stats briefly).
+  const allPlayers = boxScore.teams.flatMap((t) => t.players);
+  const totalPoints = allPlayers.reduce((sum, p) => sum + p.points, 0);
+  const skipStats = allPlayers.length > 0 && totalPoints === 0 && game.status === 'final';
+  if (skipStats) {
+    console.warn(
+      `[statSync] Suspicious: all ${allPlayers.length} players have 0 points for final game ${game.external_game_id} — skipping stat upserts`
+    );
+  }
+
   // Build a map of external_team_id → internal team record so we can resolve
   // opponent_team_id for each player's stat entry.
   const teamRecords = {};
@@ -60,7 +71,8 @@ async function processGame(game) {
 
   // Upsert stats for each player in each team.
   // First Four play-in games have no scoring impact — skip stat insertion.
-  if (!isFirstFour) {
+  // Also skip when ESPN returns suspicious all-zero data for final games.
+  if (!isFirstFour && !skipStats) {
     for (const teamData of boxScore.teams) {
       const opponentExternalId = boxScore.teams
         .map((t) => t.external_team_id)

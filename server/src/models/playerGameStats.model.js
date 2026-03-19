@@ -6,7 +6,7 @@ async function create(playerId, gameDate, opponentTeamId, points, tournamentRoun
        (player_id, game_date, opponent_team_id, points, tournament_round, external_game_id)
      VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (player_id, external_game_id) DO UPDATE
-       SET points = EXCLUDED.points
+       SET points = GREATEST(player_game_stats.points, EXCLUDED.points)
      RETURNING *`,
     [playerId, gameDate, opponentTeamId, points, tournamentRound, externalGameId]
   );
