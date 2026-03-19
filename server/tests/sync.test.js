@@ -191,6 +191,100 @@ describe('statSync.job', () => {
     expect(teamResult.rows[0].is_eliminated).toBe(false);
   });
 
+  // ─── Points persistence ────────────────────────────────────────────────────
+
+  it('does not overwrite existing points with 0 when ESPN returns bad data', async () => {
+    const teamA = await createTestTeam({ external_id: 'ext-team-1', wins: 0 });
+    const teamB = await createTestTeam({ external_id: 'ext-team-2', wins: 0 });
+    const p1 = await createTestPlayer(teamA.id, { external_id: 'ext-player-1' });
+    const p2 = await createTestPlayer(teamB.id, { external_id: 'ext-player-2' });
+
+    // First sync: real points from an in-progress game
+    externalApi.fetchTodaysGames.mockResolvedValue([
+      makeGameResponse({ status: 'in_progress', winner_external_id: null, loser_external_id: null }),
+    ]);
+    externalApi.fetchGameBoxScore.mockResolvedValue(makeBoxScore());
+
+    await runSyncJob();
+
+    let stats = await pool.query(
+      'SELECT points FROM player_game_stats WHERE player_id = $1',
+      [p1.id]
+    );
+    expect(stats.rows[0].points).toBe(22);
+
+    // Second sync: ESPN returns 0 for all players (the bug scenario)
+    externalApi.fetchTodaysGames.mockResolvedValue([
+      makeGameResponse({ status: 'in_progress', winner_external_id: null, loser_external_id: null }),
+    ]);
+    externalApi.fetchGameBoxScore.mockResolvedValue(
+      makeBoxScore({
+        teams: [
+          { external_team_id: 'ext-team-1', players: [{ external_player_id: 'ext-player-1', points: 0 }] },
+          { external_team_id: 'ext-team-2', players: [{ external_player_id: 'ext-player-2', points: 0 }] },
+        ],
+      })
+    );
+
+    await runSyncJob();
+
+    // Points should be preserved via GREATEST, not overwritten to 0
+    stats = await pool.query(
+      'SELECT points FROM player_game_stats WHERE player_id = $1',
+      [p1.id]
+    );
+    expect(stats.rows[0].points).toBe(22);
+
+    stats = await pool.query(
+      'SELECT points FROM player_game_stats WHERE player_id = $1',
+      [p2.id]
+    );
+    expect(stats.rows[0].points).toBe(14);
+  });
+
+  it('allows points to increase during in-progress games', async () => {
+    const teamA = await createTestTeam({ external_id: 'ext-team-1', wins: 0 });
+    const teamB = await createTestTeam({ external_id: 'ext-team-2', wins: 0 });
+    const p1 = await createTestPlayer(teamA.id, { external_id: 'ext-player-1' });
+    await createTestPlayer(teamB.id, { external_id: 'ext-player-2' });
+
+    // First sync: halftime scores
+    externalApi.fetchTodaysGames.mockResolvedValue([
+      makeGameResponse({ status: 'in_progress', winner_external_id: null, loser_external_id: null }),
+    ]);
+    externalApi.fetchGameBoxScore.mockResolvedValue(
+      makeBoxScore({
+        teams: [
+          { external_team_id: 'ext-team-1', players: [{ external_player_id: 'ext-player-1', points: 15 }] },
+          { external_team_id: 'ext-team-2', players: [{ external_player_id: 'ext-player-2', points: 10 }] },
+        ],
+      })
+    );
+
+    await runSyncJob();
+
+    let stats = await pool.query(
+      'SELECT points FROM player_game_stats WHERE player_id = $1',
+      [p1.id]
+    );
+    expect(stats.rows[0].points).toBe(15);
+
+    // Second sync: updated scores later in the game
+    externalApi.fetchTodaysGames.mockResolvedValue([
+      makeGameResponse({ status: 'in_progress', winner_external_id: null, loser_external_id: null }),
+    ]);
+    externalApi.fetchGameBoxScore.mockResolvedValue(makeBoxScore());
+
+    await runSyncJob();
+
+    // Points should increase to 22
+    stats = await pool.query(
+      'SELECT points FROM player_game_stats WHERE player_id = $1',
+      [p1.id]
+    );
+    expect(stats.rows[0].points).toBe(22);
+  });
+
   // ─── First Four handling ────────────────────────────────────────────────────
 
   it('does NOT create player_game_stats for First Four games', async () => {

@@ -125,12 +125,15 @@ function transformBoxScore(data, externalGameId, fallbackRound) {
 
     const players = [];
     for (const statGroup of teamEntry.statistics || []) {
+      const labels = statGroup.labels || [];
+      const ptsIdx = labels.indexOf('PTS');
+      if (ptsIdx < 0) {
+        console.warn(`[externalApi] PTS label missing for game ${externalGameId}, team ${externalTeamId} — skipping player stats for this group`);
+        continue;
+      }
       for (const athlete of statGroup.athletes || []) {
         const stats = athlete.stats || [];
-        // ESPN: stats array order varies; find PTS by label
-        const labels = statGroup.labels || [];
-        const ptsIdx = labels.indexOf('PTS');
-        const ptsStr = ptsIdx >= 0 ? stats[ptsIdx] : '0';
+        const ptsStr = stats[ptsIdx] || '0';
         const points = parseInt(ptsStr, 10) || 0;
 
         players.push({
