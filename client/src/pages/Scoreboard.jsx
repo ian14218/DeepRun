@@ -16,6 +16,16 @@ const STATUS_VARIANT = {
   upcoming: 'secondary',
 };
 
+function formatGameTime(isoString) {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
+}
+
 export default function Scoreboard() {
   useDocumentTitle('Scoreboard');
   const { id: leagueId } = useParams();
@@ -105,10 +115,14 @@ export default function Scoreboard() {
                     </div>
                     <div className="text-right shrink-0">
                       <div className="text-xl font-bold tabular-nums">
-                        {game.home_score} – {game.away_score}
+                        {statusKey === 'upcoming' ? '—' : `${game.home_score} – ${game.away_score}`}
                       </div>
                       <Badge variant={variant} className="text-[10px] mt-1">
-                        {game.status?.toUpperCase()}
+                        {statusKey === 'upcoming'
+                          ? formatGameTime(game.start_time)
+                          : statusKey === 'in_progress'
+                            ? (game.status_detail || 'LIVE')
+                            : game.status?.toUpperCase()}
                       </Badge>
                     </div>
                   </div>

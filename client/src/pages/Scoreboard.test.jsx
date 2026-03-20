@@ -41,6 +41,30 @@ const mockGames = [
   },
 ];
 
+const mockUpcomingGame = {
+  id: 'game-2',
+  home_team: 'Team C',
+  away_team: 'Team D',
+  status: 'upcoming',
+  home_score: 0,
+  away_score: 0,
+  start_time: '2026-03-20T19:10:00Z',
+  tournament_round: 'Round of 64',
+  players: [],
+};
+
+const mockInProgressGame = {
+  id: 'game-3',
+  home_team: 'Team E',
+  away_team: 'Team F',
+  status: 'in_progress',
+  status_detail: '7:32 - 2nd',
+  home_score: 34,
+  away_score: 28,
+  tournament_round: 'Round of 64',
+  players: [],
+};
+
 function renderScoreboard() {
   return render(
     <AuthContext.Provider value={{ user: { id: USER_ID, username: 'alice' }, token: 'tok' }}>
@@ -97,6 +121,30 @@ describe('Scoreboard page', () => {
     await waitFor(() => {
       // p2 is not in the user's roster — no highlight element
       expect(screen.queryByTestId('drafted-player-p2')).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows formatted start time for upcoming games instead of score', async () => {
+    standingsService.getScoreboard.mockResolvedValue([mockUpcomingGame]);
+    renderScoreboard();
+    await waitFor(() => {
+      expect(screen.getByText('Team C')).toBeInTheDocument();
+      expect(screen.getByText('—')).toBeInTheDocument();
+      // Should not show "UPCOMING" text
+      expect(screen.queryByText('UPCOMING')).not.toBeInTheDocument();
+      // Should show a formatted time (contains AM or PM)
+      expect(screen.getByText(/[AP]M/)).toBeInTheDocument();
+    });
+  });
+
+  it('shows status_detail for in-progress games', async () => {
+    standingsService.getScoreboard.mockResolvedValue([mockInProgressGame]);
+    renderScoreboard();
+    await waitFor(() => {
+      expect(screen.getByText('Team E')).toBeInTheDocument();
+      expect(screen.getByText('7:32 - 2nd')).toBeInTheDocument();
+      expect(screen.getByText(/34/)).toBeInTheDocument();
+      expect(screen.getByText(/28/)).toBeInTheDocument();
     });
   });
 
