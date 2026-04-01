@@ -83,3 +83,11 @@ export function togglePlayerInjury(playerId, injuryStatus) {
 export function refreshSeasonStats(year = 2026) {
   return api.post('/api/admin/refresh-stats', { year }).then((r) => r.data);
 }
+
+export function getTournamentConfig() {
+  return api.get('/api/admin/tournament/config').then((r) => r.data);
+}
+
+export function setTournamentConfig(key, value) {
+  return api.put(`/api/admin/tournament/config/${key}`, { value }).then((r) => r.data);
+}

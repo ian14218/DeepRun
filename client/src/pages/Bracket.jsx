@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getLeague } from '../services/leagueService';
-import { getTournamentTeams, getTeamRoster } from '../services/standingsService';
+import { getTournamentTeams, getTeamRoster, getBracketLayout } from '../services/standingsService';
 import { Trophy } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,18 +13,21 @@ export default function Bracket() {
   const { user } = useAuth();
   const [teams, setTeams] = useState([]);
   const [draftedCountByTeam, setDraftedCountByTeam] = useState({});
+  const [bracketLayout, setBracketLayout] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     async function load() {
       try {
-        const [teamsData, league] = await Promise.all([
+        const [teamsData, league, layout] = await Promise.all([
           getTournamentTeams(),
           getLeague(leagueId),
+          getBracketLayout().catch(() => null),
         ]);
 
         setTeams(teamsData);
+        if (layout) setBracketLayout(layout);
 
         // Build drafted-player-count map if draft is completed
         if (league.draft_status === 'completed') {
@@ -77,7 +80,7 @@ export default function Bracket() {
           </CardContent>
         </Card>
       ) : (
-        <BracketView teams={teams} draftedCountByTeam={draftedCountByTeam} />
+        <BracketView teams={teams} draftedCountByTeam={draftedCountByTeam} bracketLayout={bracketLayout} />
       )}
     </div>
   );

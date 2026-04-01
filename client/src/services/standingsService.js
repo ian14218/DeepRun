@@ -24,3 +24,8 @@ export async function getTournamentTeams() {
   const res = await api.get('/api/tournaments/teams');
   return res.data;
 }
+
+export async function getBracketLayout() {
+  const res = await api.get('/api/tournaments/config/bracket-layout');
+  return res.data;
+}

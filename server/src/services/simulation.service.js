@@ -3,6 +3,7 @@ const playerModel = require('../models/player.model');
 const playerGameStats = require('../models/playerGameStats.model');
 const eliminationService = require('./elimination.service');
 const tournamentTeamModel = require('../models/tournamentTeam.model');
+const tournamentConfigModel = require('../models/tournamentConfig.model');
 const bestBallService = require('./bestBall.service');
 const bestBallModel = require('../models/bestBall.model');
 
@@ -13,12 +14,6 @@ const R64_SEED_MATCHUPS = [
 ];
 
 const REGIONS = ['East', 'Midwest', 'South', 'West'];
-
-// Cross-region pairings for Final Four (must match BracketView.jsx)
-const FF_PAIRINGS = [
-  ['East', 'West'],
-  ['South', 'Midwest'],
-];
 
 function getRoundName(teamCount) {
   const rounds = {
@@ -52,7 +47,7 @@ const ROUND_SHORT = {
  * For rounds 2-4 this reconstructs the bracket tree from R64 seed positions
  * so that e.g. the winner of 1v16 plays the winner of 8v9, not a random team.
  */
-function buildBracketMatchups(allTeams, roundNum) {
+function buildBracketMatchups(allTeams, roundNum, ffPairings) {
   const byRegion = {};
   for (const team of allTeams) {
     if (!byRegion[team.region]) byRegion[team.region] = [];
@@ -137,7 +132,7 @@ function buildBracketMatchups(allTeams, roundNum) {
   if (roundNum === 5) {
     // Final Four: one surviving team per region, paired cross-region
     const matchups = [];
-    for (const [regionA, regionB] of FF_PAIRINGS) {
+    for (const [regionA, regionB] of ffPairings) {
       const activeA = (byRegion[regionA] || []).find((t) => !t.is_eliminated);
       const activeB = (byRegion[regionB] || []).find((t) => !t.is_eliminated);
       if (activeA && activeB) matchups.push({ teamA: activeA, teamB: activeB });
@@ -177,8 +172,10 @@ async function simulateRound() {
 
   const roundNum = getRoundNum(activeCount);
 
-  // 3. Build bracket-aware matchups
-  const matchups = buildBracketMatchups(allTeams, roundNum);
+  // 3. Build bracket-aware matchups (fetch FF pairings from config for Final Four)
+  const bracketLayout = await tournamentConfigModel.getBracketLayout();
+  const ffPairings = [bracketLayout.left, bracketLayout.right];
+  const matchups = buildBracketMatchups(allTeams, roundNum, ffPairings);
 
   const games = [];
   const today = new Date().toISOString().slice(0, 10);
