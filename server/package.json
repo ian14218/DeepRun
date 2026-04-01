@@ -2,6 +2,11 @@
   "name": "server",
   "version": "1.0.0",
   "private": true,
+  "description": "DeepRun Express/Node backend API",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

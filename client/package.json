@@ -1,6 +1,11 @@
 {
   "name": "client",
   "private": true,
+  "description": "DeepRun React/Vite frontend",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "version": "0.0.0",
   "type": "module",
   "scripts": {
