@@ -25,7 +25,8 @@ async function findByInviteCode(inviteCode) {
 
 async function findByUserId(userId) {
   const result = await pool.query(
-    `SELECT l.*
+    `SELECT l.*,
+       (SELECT COUNT(*) FROM league_members lm2 WHERE lm2.league_id = l.id) AS member_count
      FROM leagues l
      JOIN league_members lm ON lm.league_id = l.id
      WHERE lm.user_id = $1
