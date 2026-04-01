@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { getAdminStats, getAdminTeams, getAdminPlayers, simulateTournamentRound, resetSimulation, getFirstFourPairs, createFirstFourPair, removeFirstFourPair, backfillSync, seedTournament, seedFirstFour, togglePlayerInjury, refreshSeasonStats } from '../../services/adminService';
+import { getAdminStats, getAdminTeams, getAdminPlayers, simulateTournamentRound, resetSimulation, getFirstFourPairs, createFirstFourPair, removeFirstFourPair, backfillSync, seedTournament, seedFirstFour, togglePlayerInjury, refreshSeasonStats, getTournamentConfig, setTournamentConfig } from '../../services/adminService';
 import { toast } from 'sonner';
 import TeamLogo from '../../components/TeamLogo';
 
@@ -40,6 +40,10 @@ export default function AdminTournament() {
   const [backfilling, setBackfilling] = useState(false);
   const [refreshingStats, setRefreshingStats] = useState(false);
 
+  // Bracket layout state
+  const [bracketLayout, setBracketLayout] = useState({ left: ['East', 'West'], right: ['South', 'Midwest'] });
+  const [savingLayout, setSavingLayout] = useState(false);
+
   useEffect(() => {
     getAdminStats()
       .then((stats) => setSimulationEnabled(!!stats.simulationEnabled))
@@ -48,6 +52,17 @@ export default function AdminTournament() {
       .then(setTeams)
       .catch(() => toast.error('Failed to load teams'))
       .finally(() => setTeamsLoading(false));
+    getTournamentConfig()
+      .then((config) => {
+        const layoutRow = config.find((c) => c.key === 'bracket_layout');
+        if (layoutRow) {
+          try {
+            const parsed = JSON.parse(layoutRow.value);
+            if (parsed.left?.length === 2 && parsed.right?.length === 2) setBracketLayout(parsed);
+          } catch { /* use default */ }
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const fetchPlayers = useCallback((s = playerSearch, t = playerTeamFilter, p = 1) => {
@@ -192,6 +207,24 @@ export default function AdminTournament() {
       toast.error(err.response?.data?.error || 'Backfill failed');
     } finally {
       setBackfilling(false);
+    }
+  }
+
+  async function handleSaveBracketLayout() {
+    const all = [...bracketLayout.left, ...bracketLayout.right];
+    const unique = new Set(all);
+    if (unique.size !== 4) {
+      toast.error('All four regions must be distinct');
+      return;
+    }
+    setSavingLayout(true);
+    try {
+      await setTournamentConfig('bracket_layout', JSON.stringify(bracketLayout));
+      toast.success('Bracket layout saved');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save bracket layout');
+    } finally {
+      setSavingLayout(false);
     }
   }
 
@@ -508,6 +541,64 @@ export default function AdminTournament() {
         </TabsContent>
         <TabsContent value="setup">
           <div className="space-y-4">
+            {/* Bracket Layout */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Bracket Layout</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Configure which regions appear on each side of the bracket. Regions on the same side play each other in the Final Four.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Left Side</p>
+                    {[0, 1].map((idx) => (
+                      <select
+                        key={`left-${idx}`}
+                        value={bracketLayout.left[idx]}
+                        onChange={(e) => {
+                          const next = { ...bracketLayout, left: [...bracketLayout.left] };
+                          next.left[idx] = e.target.value;
+                          setBracketLayout(next);
+                        }}
+                        className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        {['East', 'West', 'South', 'Midwest'].map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    ))}
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Right Side</p>
+                    {[0, 1].map((idx) => (
+                      <select
+                        key={`right-${idx}`}
+                        value={bracketLayout.right[idx]}
+                        onChange={(e) => {
+                          const next = { ...bracketLayout, right: [...bracketLayout.right] };
+                          next.right[idx] = e.target.value;
+                          setBracketLayout(next);
+                        }}
+                        className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        {['East', 'West', 'South', 'Midwest'].map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  FF Game 1: {bracketLayout.left[0]} vs {bracketLayout.left[1]} | FF Game 2: {bracketLayout.right[0]} vs {bracketLayout.right[1]}
+                </p>
+                <Button onClick={handleSaveBracketLayout} disabled={savingLayout}>
+                  {savingLayout ? 'Saving...' : 'Save Layout'}
+                </Button>
+              </CardContent>
+            </Card>
+
             {/* Seed Tournament */}
             <Card>
               <CardHeader>

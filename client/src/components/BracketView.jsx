@@ -97,7 +97,7 @@ function effectiveWins(team) {
   return team.wins - (team.is_first_four ? 1 : 0);
 }
 
-function buildFinalRounds(regionRounds) {
+function buildFinalRounds(regionRounds, bracketLayout) {
   const winner = (region) => {
     const e8 = regionRounds[region]?.[3];
     if (!e8) return null;
@@ -106,7 +106,8 @@ function buildFinalRounds(regionRounds) {
     return null;
   };
 
-  const ff = [winner('East'), winner('West'), winner('South'), winner('Midwest')];
+  const { left, right } = bracketLayout;
+  const ff = [winner(left[0]), winner(left[1]), winner(right[0]), winner(right[1])];
 
   const champ = [];
   for (let i = 0; i < 4; i += 2) {
@@ -451,19 +452,26 @@ function FirstFourSection({ teams, draftedCountByTeam }) {
 // Exported for testing
 export { buildRegionRounds, buildFinalRounds };
 
-export default function BracketView({ teams, draftedCountByTeam = {} }) {
+const DEFAULT_BRACKET_LAYOUT = { left: ['East', 'West'], right: ['South', 'Midwest'] };
+
+export default function BracketView({ teams, draftedCountByTeam = {}, bracketLayout = DEFAULT_BRACKET_LAYOUT }) {
+  const layout = (bracketLayout?.left?.length === 2 && bracketLayout?.right?.length === 2)
+    ? bracketLayout
+    : DEFAULT_BRACKET_LAYOUT;
+
   const byRegion = {};
   teams.forEach((t) => {
     if (!byRegion[t.region]) byRegion[t.region] = [];
     byRegion[t.region].push(t);
   });
 
+  const allRegions = [...layout.left, ...layout.right];
   const regionRounds = {};
-  ['East', 'West', 'South', 'Midwest'].forEach((r) => {
+  allRegions.forEach((r) => {
     regionRounds[r] = buildRegionRounds(byRegion[r] || []);
   });
 
-  const { ff, champ, champion } = buildFinalRounds(regionRounds);
+  const { ff, champ, champion } = buildFinalRounds(regionRounds, layout);
 
   // Total width: 2 region sides + center + gaps
   const regionW = 4 * SLOT_W + 3 * CONN_W;
@@ -473,16 +481,16 @@ export default function BracketView({ teams, draftedCountByTeam = {} }) {
     <ScrollArea className="w-full">
       <FirstFourSection teams={teams} draftedCountByTeam={draftedCountByTeam} />
       <div className="flex items-start p-4" style={{ minWidth: totalW }}>
-        {/* Left half: East (top) + West (bottom), progressing L → R */}
+        {/* Left half: two regions progressing L → R */}
         <div className="shrink-0 flex flex-col" style={{ gap: REGION_GAP }}>
           <RegionBracket
-            label="East"
-            rounds={regionRounds.East}
+            label={layout.left[0]}
+            rounds={regionRounds[layout.left[0]]}
             draftedCountByTeam={draftedCountByTeam}
           />
           <RegionBracket
-            label="West"
-            rounds={regionRounds.West}
+            label={layout.left[1]}
+            rounds={regionRounds[layout.left[1]]}
             draftedCountByTeam={draftedCountByTeam}
           />
         </div>
@@ -495,17 +503,17 @@ export default function BracketView({ teams, draftedCountByTeam = {} }) {
           draftedCountByTeam={draftedCountByTeam}
         />
 
-        {/* Right half: South (top) + Midwest (bottom), progressing R → L */}
+        {/* Right half: two regions progressing R → L */}
         <div className="shrink-0 flex flex-col" style={{ gap: REGION_GAP }}>
           <RegionBracket
-            label="South"
-            rounds={regionRounds.South}
+            label={layout.right[0]}
+            rounds={regionRounds[layout.right[0]]}
             draftedCountByTeam={draftedCountByTeam}
             reverse
           />
           <RegionBracket
-            label="Midwest"
-            rounds={regionRounds.Midwest}
+            label={layout.right[1]}
+            rounds={regionRounds[layout.right[1]]}
             draftedCountByTeam={draftedCountByTeam}
             reverse
           />

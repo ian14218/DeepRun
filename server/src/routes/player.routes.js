@@ -1,6 +1,7 @@
 const express = require('express');
 const playerService = require('../services/player.service');
 const tournamentTeamModel = require('../models/tournamentTeam.model');
+const tournamentConfigModel = require('../models/tournamentConfig.model');
 const playerModel = require('../models/player.model');
 const pool = require('../db');
 
@@ -27,6 +28,16 @@ router.get('/tournaments/teams', async (req, res) => {
   try {
     const teams = await playerService.getTournamentTeams();
     return res.json(teams);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/tournaments/config/bracket-layout — public bracket layout config
+router.get('/tournaments/config/bracket-layout', async (req, res) => {
+  try {
+    const layout = await tournamentConfigModel.getBracketLayout();
+    return res.json(layout);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

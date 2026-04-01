@@ -6,6 +6,7 @@ const pool = require('../db');
 const simulationService = require('../services/simulation.service');
 const userModel = require('../models/user.model');
 const tournamentTeamModel = require('../models/tournamentTeam.model');
+const tournamentConfigModel = require('../models/tournamentConfig.model');
 const { runSyncForDate } = require('../jobs/statSync.job');
 const bestBallModel = require('../models/bestBall.model');
 const bestBallPricing = require('../services/bestBallPricing.service');
@@ -219,6 +220,30 @@ router.delete('/tournament/first-four-pairs/:teamId', async (req, res) => {
   try {
     await tournamentTeamModel.clearFirstFourPair(req.params.teamId);
     res.json({ message: 'First Four pair removed' });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// ─── Tournament Config ─────────────────────────────────────────────────────
+
+router.get('/tournament/config', async (req, res) => {
+  try {
+    const config = await tournamentConfigModel.getAllConfig();
+    res.json(config);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.put('/tournament/config/:key', async (req, res) => {
+  try {
+    const { value } = req.body;
+    if (value === undefined || value === null) {
+      return res.status(400).json({ error: 'value is required' });
+    }
+    await tournamentConfigModel.setConfig(req.params.key, typeof value === 'string' ? value : JSON.stringify(value));
+    res.json({ message: `Config "${req.params.key}" updated` });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }
