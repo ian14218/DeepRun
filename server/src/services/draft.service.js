@@ -3,6 +3,10 @@ const leagueModel = require('../models/league.model');
 const draftPickModel = require('../models/draftPick.model');
 const playerModel = require('../models/player.model');
 const tournamentTeamModel = require('../models/tournamentTeam.model');
+const { createError } = require('../utils/errors');
+const { validateFirstFourPairing, pickRandomFirstFourPair } = require('../utils/firstFourValidation');
+
+const DEFAULT_DRAFT_TIMER_SECONDS = 90;
 
 // ─── Draft timers (in-memory) ────────────────────────────────────────────────
 const draftTimers = new Map(); // leagueId → { timeout, expiresAt, paused, remainingOnPause, io, disabled }
@@ -119,33 +123,9 @@ async function autoPickOnTimeout(leagueId, io) {
 
   // Pick a random available non-eliminated, non-injured player (exclude both primary and paired IDs)
   const draftedPlayerIds = picks.flatMap((p) => [p.player_id, p.paired_player_id].filter(Boolean));
-  const availableResult = await pool.query(
-    `SELECT p.id, tt.is_first_four, tt.first_four_partner_id, tt.is_eliminated AS team_eliminated
-     FROM players p
-     JOIN tournament_teams tt ON tt.id = p.team_id
-     WHERE p.id != ALL($1::uuid[]) AND p.is_eliminated = false
-       AND COALESCE(p.injury_status, '') != 'Out'
-     ORDER BY RANDOM() LIMIT 1`,
-    [draftedPlayerIds]
-  );
-  if (availableResult.rows.length === 0) return;
-
-  const chosen = availableResult.rows[0];
-  let pairedPlayerId = null;
-  // Only pair if First Four and partner team is still alive
-  if (chosen.is_first_four && chosen.first_four_partner_id) {
-    const partnerTeam = await tournamentTeamModel.findById(chosen.first_four_partner_id);
-    if (partnerTeam && !partnerTeam.is_eliminated) {
-      const partnerResult = await pool.query(
-        `SELECT p.id FROM players p
-         WHERE p.team_id = $1 AND p.id != ALL($2::uuid[]) AND p.is_eliminated = false
-           AND COALESCE(p.injury_status, '') != 'Out'
-         ORDER BY RANDOM() LIMIT 1`,
-        [chosen.first_four_partner_id, draftedPlayerIds]
-      );
-      pairedPlayerId = partnerResult.rows[0]?.id || null;
-    }
-  }
+  const chosen = await playerModel.findRandomAvailable(draftedPlayerIds);
+  if (!chosen) return;
+  const pairedPlayerId = await pickRandomFirstFourPair(chosen, draftedPlayerIds);
 
   const playerId = chosen.id;
   const pick = await makePick(leagueId, onTheClock.user_id, playerId, pairedPlayerId);
@@ -174,7 +154,7 @@ async function autoPickOnTimeout(leagueId, io) {
     // Start timer for next human turn
     const updatedLeague = await leagueModel.findById(leagueId);
     if (updatedLeague && updatedLeague.draft_status === 'in_progress') {
-      startDraftTimer(leagueId, updatedLeague.draft_timer_seconds ?? 90, io);
+      startDraftTimer(leagueId, updatedLeague.draft_timer_seconds ?? DEFAULT_DRAFT_TIMER_SECONDS, io);
     }
   }
 }
@@ -215,19 +195,18 @@ function isDraftComplete(totalPicks, teamCount, rosterSize) {
 
 async function startDraft(leagueId, userId) {
   const league = await leagueModel.findById(leagueId);
-  if (!league) { const e = new Error('League not found'); e.status = 404; throw e; }
+  if (!league) throw createError('League not found', 404);
 
   if (league.commissioner_id !== userId) {
-    const e = new Error('Only the commissioner can start the draft'); e.status = 403; throw e;
+    throw createError('Only the commissioner can start the draft', 403);
   }
   if (league.draft_status !== 'pre_draft') {
-    const e = new Error('Draft has already started'); e.status = 400; throw e;
+    throw createError('Draft has already started', 400);
   }
 
   const members = await leagueModel.findMembersByLeague(leagueId);
   if (members.length < league.team_count) {
-    const e = new Error(`League is not full (${members.length}/${league.team_count})`);
-    e.status = 400; throw e;
+    throw createError(`League is not full (${members.length}/${league.team_count})`, 400);
   }
 
   // Use custom draft order if commissioner set one, otherwise random shuffle
@@ -258,56 +237,36 @@ async function startDraft(leagueId, userId) {
     };
   }).sort((a, b) => a.draft_position - b.draft_position);
 
-  return { draft_status: 'in_progress', draft_order, draft_timer_seconds: league.draft_timer_seconds ?? 90 };
+  return { draft_status: 'in_progress', draft_order, draft_timer_seconds: league.draft_timer_seconds ?? DEFAULT_DRAFT_TIMER_SECONDS };
+}
+
+/**
+ * Validate that a player is eligible to be drafted (exists, not eliminated, not injured)
+ * and validate First Four pairing if applicable.
+ * Returns the validated pairedPlayerId (may be cleared if partner eliminated).
+ */
+async function validatePickEligibility(playerId, pairedPlayerId) {
+  const player = await playerModel.findById(playerId);
+  if (!player) throw createError('Player not found', 404);
+  if (player.is_eliminated) throw createError('Cannot draft an eliminated player', 400);
+  if (player.injury_status === 'Out') throw createError('Cannot draft a player who is out with an injury', 400);
+
+  const team = await tournamentTeamModel.findById(player.team_id);
+  return validateFirstFourPairing({
+    isFirstFour: team?.is_first_four,
+    partnerId: team?.first_four_partner_id,
+    pairedPlayerId,
+    findTeamById: tournamentTeamModel.findById,
+    findPlayerById: playerModel.findById,
+  });
 }
 
 async function makePick(leagueId, userId, playerId, inputPairedPlayerId = null) {
-  let pairedPlayerId = inputPairedPlayerId;
   // Read members outside the transaction (league_members don't change during a pick)
   const members = await leagueModel.findMembersByLeague(leagueId);
 
-  // Validate First Four pairing requirements before entering transaction
-  const player = await playerModel.findById(playerId);
-  if (!player) { const e = new Error('Player not found'); e.status = 404; throw e; }
-
-  // Block picking eliminated players
-  if (player.is_eliminated) {
-    const e = new Error('Cannot draft an eliminated player'); e.status = 400; throw e;
-  }
-
-  // Block picking injured (OUT) players
-  if (player.injury_status === 'Out') {
-    const e = new Error('Cannot draft a player who is out with an injury'); e.status = 400; throw e;
-  }
-
-  const team = await tournamentTeamModel.findById(player.team_id);
-
-  // First Four pairing: only required if the partner team is still alive
-  const partnerAlive = team && team.is_first_four && team.first_four_partner_id
-    ? !(await tournamentTeamModel.findById(team.first_four_partner_id)).is_eliminated
-    : false;
-
-  if (team && team.is_first_four && partnerAlive) {
-    if (!pairedPlayerId) {
-      const e = new Error('First Four player requires a paired player from the partner team'); e.status = 400; throw e;
-    }
-    const pairedPlayer = await playerModel.findById(pairedPlayerId);
-    if (!pairedPlayer) { const e = new Error('Paired player not found'); e.status = 404; throw e; }
-    if (pairedPlayer.team_id !== team.first_four_partner_id) {
-      const e = new Error('Paired player must be from the First Four partner team'); e.status = 400; throw e;
-    }
-    if (pairedPlayer.is_eliminated) {
-      const e = new Error('Cannot draft an eliminated paired player'); e.status = 400; throw e;
-    }
-  } else if (pairedPlayerId && !(team && team.is_first_four && !partnerAlive)) {
-    // Allow (but ignore) pairedPlayerId if partner was eliminated — otherwise reject
-    const e = new Error('Cannot pair a player who is not in the First Four'); e.status = 400; throw e;
-  }
-
-  // If partner is eliminated, clear the pairedPlayerId (no longer relevant)
-  if (team && team.is_first_four && !partnerAlive) {
-    pairedPlayerId = null;
-  }
+  // Validate player eligibility and First Four pairing before entering transaction
+  const pairedPlayerId = await validatePickEligibility(playerId, inputPairedPlayerId);
 
   const client = await pool.connect();
   let pick, onTheClock, snakeOrder, pickNumber, complete;
@@ -321,13 +280,13 @@ async function makePick(leagueId, userId, playerId, inputPairedPlayerId = null) 
       [leagueId]
     );
     const league = leagueResult.rows[0];
-    if (!league) { const e = new Error('League not found'); e.status = 404; throw e; }
+    if (!league) throw createError('League not found', 404);
 
     if (league.draft_status === 'completed') {
-      const e = new Error('Draft is already complete'); e.status = 400; throw e;
+      throw createError('Draft is already complete', 400);
     }
     if (league.draft_status !== 'in_progress') {
-      const e = new Error('Draft has not started'); e.status = 400; throw e;
+      throw createError('Draft has not started', 400);
     }
 
     const countResult = await client.query(
@@ -340,12 +299,12 @@ async function makePick(leagueId, userId, playerId, inputPairedPlayerId = null) 
     const currentPos = getCurrentPickPosition(picksMade, snakeOrder);
 
     if (currentPos === null) {
-      const e = new Error('Draft is already complete'); e.status = 400; throw e;
+      throw createError('Draft is already complete', 400);
     }
 
     onTheClock = members.find((m) => m.draft_position === currentPos);
     if (!onTheClock || onTheClock.user_id !== userId) {
-      const e = new Error('It is not your turn'); e.status = 403; throw e;
+      throw createError('It is not your turn', 403);
     }
 
     // Check primary player not already drafted (as primary or paired)
@@ -354,7 +313,7 @@ async function makePick(leagueId, userId, playerId, inputPairedPlayerId = null) 
       [leagueId, playerId]
     );
     if (dupResult.rowCount > 0) {
-      const e = new Error('Player has already been drafted'); e.status = 400; throw e;
+      throw createError('Player has already been drafted', 400);
     }
 
     // Check paired player not already drafted
@@ -364,7 +323,7 @@ async function makePick(leagueId, userId, playerId, inputPairedPlayerId = null) 
         [leagueId, pairedPlayerId]
       );
       if (dupPairedResult.rowCount > 0) {
-        const e = new Error('Paired player has already been drafted'); e.status = 400; throw e;
+        throw createError('Paired player has already been drafted', 400);
       }
     }
 
@@ -414,7 +373,7 @@ async function makePick(leagueId, userId, playerId, inputPairedPlayerId = null) 
 
 async function getDraftState(leagueId) {
   const league  = await leagueModel.findById(leagueId);
-  if (!league) { const e = new Error('League not found'); e.status = 404; throw e; }
+  if (!league) throw createError('League not found', 404);
 
   const members    = await leagueModel.findMembersByLeague(leagueId);
   const picks      = await draftPickModel.findByLeague(leagueId);
@@ -454,14 +413,16 @@ async function getDraftState(leagueId) {
  * and emit socket events. Stops when a human's turn or the draft is complete.
  */
 async function autoPick(leagueId, io) {
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const league = await leagueModel.findById(leagueId);
-    if (!league || league.draft_status !== 'in_progress') break;
+  // Cache invariant data outside the loop — members and snakeOrder don't change during auto-pick
+  const league = await leagueModel.findById(leagueId);
+  if (!league || league.draft_status !== 'in_progress') return;
 
-    const members = await leagueModel.findMembersByLeague(leagueId);
+  const members = await leagueModel.findMembersByLeague(leagueId);
+  const snakeOrder = generateSnakeOrder(league.team_count, league.roster_size);
+
+  for (;;) {
+    // Re-fetch picks each iteration (makePick modifies them)
     const picks = await draftPickModel.findByLeague(leagueId);
-    const snakeOrder = generateSnakeOrder(league.team_count, league.roster_size);
     const currentPos = getCurrentPickPosition(picks.length, snakeOrder);
 
     if (currentPos === null) break;
@@ -469,42 +430,13 @@ async function autoPick(leagueId, io) {
     const onTheClock = members.find((m) => m.draft_position === currentPos);
     if (!onTheClock || !onTheClock.is_bot) break; // human's turn — stop
 
-    // Pick a random available non-eliminated, non-injured player (exclude both primary and paired IDs)
     const draftedPlayerIds = picks.flatMap((p) => [p.player_id, p.paired_player_id].filter(Boolean));
-    const availableResult = await pool.query(
-      `SELECT p.id, tt.is_first_four, tt.first_four_partner_id
-       FROM players p
-       JOIN tournament_teams tt ON tt.id = p.team_id
-       WHERE p.id != ALL($1::uuid[]) AND p.is_eliminated = false
-         AND COALESCE(p.injury_status, '') != 'Out'
-       ORDER BY RANDOM() LIMIT 1`,
-      [draftedPlayerIds]
-    );
+    const chosen = await playerModel.findRandomAvailable(draftedPlayerIds);
+    if (!chosen) break; // no players left
+    const pairedPlayerId = await pickRandomFirstFourPair(chosen, draftedPlayerIds);
 
-    if (availableResult.rows.length === 0) break; // no players left
+    const pick = await makePick(leagueId, onTheClock.user_id, chosen.id, pairedPlayerId);
 
-    const chosen = availableResult.rows[0];
-    let pairedPlayerId = null;
-    // Only pair if First Four and partner team is still alive
-    if (chosen.is_first_four && chosen.first_four_partner_id) {
-      const partnerTeam = await tournamentTeamModel.findById(chosen.first_four_partner_id);
-      if (partnerTeam && !partnerTeam.is_eliminated) {
-        const partnerResult = await pool.query(
-          `SELECT p.id FROM players p
-           WHERE p.team_id = $1 AND p.id != ALL($2::uuid[]) AND p.is_eliminated = false
-           ORDER BY RANDOM() LIMIT 1`,
-          [chosen.first_four_partner_id, draftedPlayerIds]
-        );
-        pairedPlayerId = partnerResult.rows[0]?.id || null;
-      }
-    }
-
-    const playerId = chosen.id;
-
-    // Use makePick with the bot's user_id
-    const pick = await makePick(leagueId, onTheClock.user_id, playerId, pairedPlayerId);
-
-    // Emit socket events
     if (io) {
       io.to(`league:${leagueId}`).emit('draft:pick', {
         pick_number:    pick.pick_number,

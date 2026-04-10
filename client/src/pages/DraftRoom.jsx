@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -137,9 +137,9 @@ export default function DraftRoom() {
     }
   }
 
-  function handlePickRequest(playerId, pairedPlayerId = null) {
+  const handlePickRequest = useCallback((playerId, pairedPlayerId = null) => {
     setPendingPick({ playerId, pairedPlayerId });
-  }
+  }, []);
 
   async function handleConfirmPick() {
     if (!pendingPick) return;
@@ -165,6 +165,12 @@ export default function DraftRoom() {
     }
   }
 
+  // Hooks must be called unconditionally (before any early returns)
+  const pickedPlayerIds = useMemo(
+    () => draftState?.picks?.flatMap((p) => [p.player_id, p.paired_player_id].filter(Boolean)) ?? [],
+    [draftState?.picks]
+  );
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -187,7 +193,6 @@ export default function DraftRoom() {
 
   const isCommissioner = league.commissioner_id === user.id;
   const isMyTurn = draftState.current_turn?.user_id === user.id;
-  const pickedPlayerIds = draftState.picks.flatMap((p) => [p.player_id, p.paired_player_id].filter(Boolean));
   const totalPicks = league.team_count * league.roster_size;
 
   // Find player name for pending pick confirmation — not used for display anymore

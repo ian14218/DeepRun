@@ -4,6 +4,8 @@ const draftService = require('../services/draft.service');
 const leagueModel = require('../models/league.model');
 const draftMessageModel = require('../models/draftMessage.model');
 
+const DEFAULT_DRAFT_TIMER_SECONDS = 90;
+
 // mergeParams: true gives us access to :id from the parent router (league id)
 const router = express.Router({ mergeParams: true });
 
@@ -24,8 +26,8 @@ router.post('/start', async (req, res) => {
     await draftService.autoPick(req.params.id, io);
 
     // Start draft timer for the first human turn
-    // ?? 90 so null/undefined defaults to 90, but 0 stays 0 (disabled)
-    draftService.startDraftTimer(req.params.id, result.draft_timer_seconds ?? 90, io);
+    // ?? so null/undefined defaults, but 0 stays 0 (disabled)
+    draftService.startDraftTimer(req.params.id, result.draft_timer_seconds ?? DEFAULT_DRAFT_TIMER_SECONDS, io);
 
     return res.status(200).json(result);
   } catch (err) {
@@ -64,9 +66,9 @@ router.post('/pick', async (req, res) => {
     if (pick.draft_status !== 'completed') {
       await draftService.autoPick(req.params.id, req.app.io);
       // Restart timer for the next human turn (use league setting, not hardcoded)
-      // ?? 90 so null/undefined defaults to 90, but 0 stays 0 (disabled)
+      // ?? so null/undefined defaults, but 0 stays 0 (disabled)
       const league = await leagueModel.findById(req.params.id);
-      const timerSeconds = league?.draft_timer_seconds ?? 90;
+      const timerSeconds = league?.draft_timer_seconds ?? DEFAULT_DRAFT_TIMER_SECONDS;
       draftService.startDraftTimer(req.params.id, timerSeconds, req.app.io);
     }
 

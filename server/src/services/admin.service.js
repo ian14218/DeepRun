@@ -70,9 +70,7 @@ async function getLeagueDetail(id) {
   );
 
   if (!leagueResult.rows[0]) {
-    const err = new Error('League not found');
-    err.status = 404;
-    throw err;
+    throw createError('League not found', 404);
   }
 
   const league = leagueResult.rows[0];
@@ -111,9 +109,7 @@ async function deleteLeague(id) {
 async function resetDraft(leagueId) {
   const league = await pool.query('SELECT id FROM leagues WHERE id = $1', [leagueId]);
   if (!league.rows[0]) {
-    const err = new Error('League not found');
-    err.status = 404;
-    throw err;
+    throw createError('League not found', 404);
   }
 
   await pool.query('DELETE FROM draft_picks WHERE league_id = $1', [leagueId]);
@@ -239,6 +235,7 @@ async function resetSimulation({ includeDrafts = false } = {}) {
 
 async function refreshSeasonStats({ year = 2026 } = {}) {
   const axios = require('axios');
+const { createError } = require('../utils/errors');
   const ESPN_STATS_BASE =
     'https://site.web.api.espn.com/apis/common/v3/sports/basketball/mens-college-basketball';
 

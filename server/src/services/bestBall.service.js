@@ -1,6 +1,8 @@
 const pool = require('../db');
 const bestBallModel = require('../models/bestBall.model');
 const pricingService = require('./bestBallPricing.service');
+const { createError } = require('../utils/errors');
+const { validateFirstFourPairing } = require('../utils/firstFourValidation');
 
 // Round of 64 tip-off times (Eastern) by tournament year.
 // The lock date defaults to 30 minutes before the first R64 game so rosters
@@ -21,12 +23,6 @@ function getLockDate() {
   const fallback = new Date();
   fallback.setDate(fallback.getDate() + 7);
   return fallback;
-}
-
-function createError(message, status) {
-  const err = new Error(message);
-  err.status = status;
-  return err;
 }
 
 /**
@@ -86,27 +82,22 @@ async function addPlayer(entryId, playerId, inputPairedPlayerId = null) {
   if (playerInfo.is_eliminated) throw createError('Cannot add an eliminated player', 400);
   if (playerInfo.injury_status === 'Out') throw createError('Cannot add a player who is out with an injury', 400);
 
-  // First Four pairing: only required if the partner team is still alive
-  const partnerAlive = playerInfo.is_first_four && playerInfo.first_four_partner_id
-    ? await pool.query('SELECT is_eliminated FROM tournament_teams WHERE id = $1', [playerInfo.first_four_partner_id])
-        .then(r => r.rows[0] && !r.rows[0].is_eliminated)
-    : false;
-
-  if (playerInfo.is_first_four && partnerAlive) {
-    if (!pairedPlayerId) throw createError('First Four player requires a paired player from the partner team', 400);
-    const pairedCheck = await pool.query('SELECT team_id, is_eliminated FROM players WHERE id = $1', [pairedPlayerId]);
-    if (!pairedCheck.rows[0] || pairedCheck.rows[0].team_id !== playerInfo.first_four_partner_id) {
-      throw createError('Paired player must be from the First Four partner team', 400);
-    }
-    if (pairedCheck.rows[0].is_eliminated) throw createError('Cannot add an eliminated paired player', 400);
-  } else if (pairedPlayerId && !(playerInfo.is_first_four && !partnerAlive)) {
-    throw createError('Cannot pair a player who is not in the First Four', 400);
-  }
-
-  // If partner is eliminated, clear pairedPlayerId (First Four resolved)
-  if (playerInfo.is_first_four && !partnerAlive) {
-    pairedPlayerId = null;
-  }
+  // Validate First Four pairing (validates, clears if partner eliminated, or rejects)
+  const findTeamById = async (id) => {
+    const r = await pool.query('SELECT * FROM tournament_teams WHERE id = $1', [id]);
+    return r.rows[0];
+  };
+  const findPlayerById = async (id) => {
+    const r = await pool.query('SELECT * FROM players WHERE id = $1', [id]);
+    return r.rows[0];
+  };
+  pairedPlayerId = await validateFirstFourPairing({
+    isFirstFour: playerInfo.is_first_four,
+    partnerId: playerInfo.first_four_partner_id,
+    pairedPlayerId,
+    findTeamById,
+    findPlayerById,
+  });
 
   const client = await pool.connect();
   try {

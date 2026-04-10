@@ -6,7 +6,12 @@ const connectionString =
     ? process.env.DATABASE_URL_TEST
     : process.env.DATABASE_URL;
 
-const poolConfig = { connectionString };
+const poolConfig = {
+  connectionString,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+};
 
 // Enable SSL for production databases (e.g. Railway, Supabase, Neon).
 // Most managed PostgreSQL providers require SSL but use self-signed certs,

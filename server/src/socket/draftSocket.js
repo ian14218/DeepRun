@@ -14,7 +14,10 @@
  */
 const jwt = require('jsonwebtoken');
 const draftMessageModel = require('../models/draftMessage.model');
+const leagueModel = require('../models/league.model');
 const { stripHtml } = require('../utils/sanitize');
+
+const MAX_MESSAGE_LENGTH = 500;
 
 function initDraftSocket(io) {
   // JWT authentication middleware — reject unauthenticated connections
@@ -38,8 +41,14 @@ function initDraftSocket(io) {
   });
 
   io.on('connection', (socket) => {
-    socket.on('join-draft', ({ leagueId }) => {
-      if (leagueId) socket.join(`league:${leagueId}`);
+    socket.on('join-draft', async ({ leagueId }) => {
+      if (!leagueId) return;
+      const member = await leagueModel.isMember(leagueId, socket.user.id);
+      if (!member) {
+        socket.emit('error', { message: 'Not a member of this league' });
+        return;
+      }
+      socket.join(`league:${leagueId}`);
     });
 
     socket.on('leave-draft', ({ leagueId }) => {
@@ -53,7 +62,7 @@ function initDraftSocket(io) {
       const userId = socket.user.id;
       const username = socket.user.username;
 
-      const sanitized = stripHtml(message).slice(0, 500);
+      const sanitized = stripHtml(message).slice(0, MAX_MESSAGE_LENGTH);
       if (!sanitized) return;
 
       try {
