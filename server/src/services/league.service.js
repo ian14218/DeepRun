@@ -2,13 +2,12 @@ const leagueModel = require('../models/league.model');
 const userModel = require('../models/user.model');
 const { generateInviteCode } = require('../utils/inviteCode');
 const { stripHtml } = require('../utils/sanitize');
+const { createError } = require('../utils/errors');
 
 async function createLeague(name, teamCount, rosterSize, commissionerId) {
   name = stripHtml(name);
   if (teamCount < 4 || teamCount > 20) {
-    const err = new Error('team_count must be between 4 and 20');
-    err.status = 400;
-    throw err;
+    throw createError('team_count must be between 4 and 20', 400);
   }
 
   // Generate a unique invite code (retry on collision)
@@ -34,23 +33,17 @@ async function createLeague(name, teamCount, rosterSize, commissionerId) {
 async function joinLeague(inviteCode, userId) {
   const league = await leagueModel.findByInviteCode(inviteCode);
   if (!league) {
-    const err = new Error('League not found');
-    err.status = 404;
-    throw err;
+    throw createError('League not found', 404);
   }
 
   const alreadyMember = await leagueModel.isMember(league.id, userId);
   if (alreadyMember) {
-    const err = new Error('Already a member of this league');
-    err.status = 409;
-    throw err;
+    throw createError('Already a member of this league', 409);
   }
 
   const memberCount = await leagueModel.getMemberCount(league.id);
   if (memberCount >= league.team_count) {
-    const err = new Error('League is full');
-    err.status = 400;
-    throw err;
+    throw createError('League is full', 400);
   }
 
   const membership = await leagueModel.addMember(league.id, userId);
@@ -60,9 +53,7 @@ async function joinLeague(inviteCode, userId) {
 async function getLeagueById(id) {
   const league = await leagueModel.findById(id);
   if (!league) {
-    const err = new Error('League not found');
-    err.status = 404;
-    throw err;
+    throw createError('League not found', 404);
   }
   const members = await leagueModel.findMembersByLeague(id);
   return { ...league, members };
@@ -75,21 +66,15 @@ async function getLeaguesByUser(userId) {
 async function updateLeague(id, fields, userId) {
   const league = await leagueModel.findById(id);
   if (!league) {
-    const err = new Error('League not found');
-    err.status = 404;
-    throw err;
+    throw createError('League not found', 404);
   }
 
   if (league.commissioner_id !== userId) {
-    const err = new Error('Only the commissioner can update league settings');
-    err.status = 403;
-    throw err;
+    throw createError('Only the commissioner can update league settings', 403);
   }
 
   if (league.draft_status !== 'pre_draft') {
-    const err = new Error('League settings cannot be changed after the draft has started');
-    err.status = 400;
-    throw err;
+    throw createError('League settings cannot be changed after the draft has started', 400);
   }
 
   // Only allow safe fields to be updated
@@ -102,9 +87,7 @@ async function updateLeague(id, fields, userId) {
 
   if (safeFields.team_count !== undefined) {
     if (safeFields.team_count < 4 || safeFields.team_count > 20) {
-      const err = new Error('team_count must be between 4 and 20');
-      err.status = 400;
-      throw err;
+      throw createError('team_count must be between 4 and 20', 400);
     }
   }
 
@@ -114,29 +97,21 @@ async function updateLeague(id, fields, userId) {
 async function fillWithBots(leagueId, userId) {
   const league = await leagueModel.findById(leagueId);
   if (!league) {
-    const err = new Error('League not found');
-    err.status = 404;
-    throw err;
+    throw createError('League not found', 404);
   }
 
   if (league.commissioner_id !== userId) {
-    const err = new Error('Only the commissioner can add bots');
-    err.status = 403;
-    throw err;
+    throw createError('Only the commissioner can add bots', 403);
   }
 
   if (league.draft_status !== 'pre_draft') {
-    const err = new Error('Can only add bots before the draft starts');
-    err.status = 400;
-    throw err;
+    throw createError('Can only add bots before the draft starts', 400);
   }
 
   const memberCount = await leagueModel.getMemberCount(leagueId);
   const openSlots = league.team_count - memberCount;
   if (openSlots <= 0) {
-    const err = new Error('League is already full');
-    err.status = 400;
-    throw err;
+    throw createError('League is already full', 400);
   }
 
   // Reuse existing bot users not already in this league, then create new ones as needed
@@ -169,28 +144,20 @@ async function fillWithBots(leagueId, userId) {
 async function leaveLeague(leagueId, userId) {
   const league = await leagueModel.findById(leagueId);
   if (!league) {
-    const err = new Error('League not found');
-    err.status = 404;
-    throw err;
+    throw createError('League not found', 404);
   }
 
   if (league.commissioner_id === userId) {
-    const err = new Error('The commissioner cannot leave the league');
-    err.status = 400;
-    throw err;
+    throw createError('The commissioner cannot leave the league', 400);
   }
 
   if (league.draft_status !== 'pre_draft') {
-    const err = new Error('Cannot leave after the draft has started');
-    err.status = 400;
-    throw err;
+    throw createError('Cannot leave after the draft has started', 400);
   }
 
   const removed = await leagueModel.removeMember(leagueId, userId);
   if (!removed) {
-    const err = new Error('You are not a member of this league');
-    err.status = 400;
-    throw err;
+    throw createError('You are not a member of this league', 400);
   }
 
   return removed;
@@ -199,34 +166,24 @@ async function leaveLeague(leagueId, userId) {
 async function removeMemberByCommissioner(leagueId, targetUserId, commissionerId) {
   const league = await leagueModel.findById(leagueId);
   if (!league) {
-    const err = new Error('League not found');
-    err.status = 404;
-    throw err;
+    throw createError('League not found', 404);
   }
 
   if (league.commissioner_id !== commissionerId) {
-    const err = new Error('Only the commissioner can remove members');
-    err.status = 403;
-    throw err;
+    throw createError('Only the commissioner can remove members', 403);
   }
 
   if (league.draft_status !== 'pre_draft') {
-    const err = new Error('Cannot remove members after the draft has started');
-    err.status = 400;
-    throw err;
+    throw createError('Cannot remove members after the draft has started', 400);
   }
 
   if (targetUserId === commissionerId) {
-    const err = new Error('The commissioner cannot be removed');
-    err.status = 400;
-    throw err;
+    throw createError('The commissioner cannot be removed', 400);
   }
 
   const removed = await leagueModel.removeMember(leagueId, targetUserId);
   if (!removed) {
-    const err = new Error('User is not a member of this league');
-    err.status = 400;
-    throw err;
+    throw createError('User is not a member of this league', 400);
   }
 
   return removed;
@@ -235,27 +192,19 @@ async function removeMemberByCommissioner(leagueId, targetUserId, commissionerId
 async function setDraftOrder(leagueId, userId, orderedMemberIds) {
   const league = await leagueModel.findById(leagueId);
   if (!league) {
-    const err = new Error('League not found');
-    err.status = 404;
-    throw err;
+    throw createError('League not found', 404);
   }
 
   if (league.commissioner_id !== userId) {
-    const err = new Error('Only the commissioner can set the draft order');
-    err.status = 403;
-    throw err;
+    throw createError('Only the commissioner can set the draft order', 403);
   }
 
   if (league.draft_status !== 'pre_draft') {
-    const err = new Error('Draft order cannot be changed after the draft has started');
-    err.status = 400;
-    throw err;
+    throw createError('Draft order cannot be changed after the draft has started', 400);
   }
 
   if (!Array.isArray(orderedMemberIds) || orderedMemberIds.length === 0) {
-    const err = new Error('orderedMemberIds must be a non-empty array');
-    err.status = 400;
-    throw err;
+    throw createError('orderedMemberIds must be a non-empty array', 400);
   }
 
   const members = await leagueModel.findMembersByLeague(leagueId);
@@ -265,22 +214,16 @@ async function setDraftOrder(leagueId, userId, orderedMemberIds) {
   const seen = new Set();
   for (const mid of orderedMemberIds) {
     if (!memberIdSet.has(mid)) {
-      const err = new Error(`Member ${mid} is not in this league`);
-      err.status = 400;
-      throw err;
+      throw createError(`Member ${mid} is not in this league`, 400);
     }
     if (seen.has(mid)) {
-      const err = new Error('Duplicate member ID in order');
-      err.status = 400;
-      throw err;
+      throw createError('Duplicate member ID in order', 400);
     }
     seen.add(mid);
   }
 
   if (orderedMemberIds.length !== members.length) {
-    const err = new Error(`Must include all ${members.length} members in the order`);
-    err.status = 400;
-    throw err;
+    throw createError(`Must include all ${members.length} members in the order`, 400);
   }
 
   await leagueModel.setMemberDraftOrder(leagueId, orderedMemberIds);

@@ -99,4 +99,21 @@ async function upsert(name, teamId, position, jerseyNumber, externalId) {
   return result.rows[0];
 }
 
-module.exports = { findAll, findById, findByExternalId, findByTeamId, eliminateByTeam, upsert };
+/**
+ * Find a random available (non-eliminated, non-injured) player not in the exclude list.
+ * Returns the player row with team first_four info, or null if none available.
+ */
+async function findRandomAvailable(excludePlayerIds = []) {
+  const result = await pool.query(
+    `SELECT p.id, tt.is_first_four, tt.first_four_partner_id, tt.is_eliminated AS team_eliminated
+     FROM players p
+     JOIN tournament_teams tt ON tt.id = p.team_id
+     WHERE p.id != ALL($1::uuid[]) AND p.is_eliminated = false
+       AND COALESCE(p.injury_status, '') != 'Out'
+     ORDER BY RANDOM() LIMIT 1`,
+    [excludePlayerIds]
+  );
+  return result.rows[0] || null;
+}
+
+module.exports = { findAll, findById, findByExternalId, findByTeamId, eliminateByTeam, upsert, findRandomAvailable };

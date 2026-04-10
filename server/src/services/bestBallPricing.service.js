@@ -1,6 +1,9 @@
 const pool = require('../db');
 const bestBallModel = require('../models/bestBall.model');
 
+// Price tier boundaries for analytics breakdown
+const PRICE_TIERS = { elite: 1500, premium: 1200, mid: 900, value: 650 };
+
 /**
  * Step 1-3: compute un-normalized projected value.
  * Pure function for unit testing.
@@ -125,10 +128,10 @@ async function generatePrices(contestId) {
     if (price < minPrice) minPrice = price;
     if (price > maxPrice) maxPrice = price;
 
-    if (price >= 1500) tierCounts.elite++;
-    else if (price >= 1200) tierCounts.premium++;
-    else if (price >= 900) tierCounts.mid++;
-    else if (price >= 650) tierCounts.value++;
+    if (price >= PRICE_TIERS.elite) tierCounts.elite++;
+    else if (price >= PRICE_TIERS.premium) tierCounts.premium++;
+    else if (price >= PRICE_TIERS.mid) tierCounts.mid++;
+    else if (price >= PRICE_TIERS.value) tierCounts.value++;
     else tierCounts.bargain++;
   }
 

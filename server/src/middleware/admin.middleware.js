@@ -1,18 +1,10 @@
-const pool = require('../db');
-
-async function requireAdmin(req, res, next) {
-  try {
-    const result = await pool.query(
-      'SELECT is_admin FROM users WHERE id = $1',
-      [req.user.id]
-    );
-    if (!result.rows[0] || !result.rows[0].is_admin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-    next();
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to verify admin status' });
+// Admin check uses the is_admin flag already decoded from the JWT by auth middleware.
+// No DB round-trip needed — admin status is embedded in the token at login time.
+function requireAdmin(req, res, next) {
+  if (!req.user || !req.user.is_admin) {
+    return res.status(403).json({ error: 'Admin access required' });
   }
+  next();
 }
 
 module.exports = { requireAdmin };

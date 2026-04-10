@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
@@ -12,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import TeamLogo from './TeamLogo';
 
-export default function DraftBoard({
+export default memo(function DraftBoard({
   picks,
   teamCount = 0,
   rosterSize = 0,
@@ -184,4 +185,4 @@ export default function DraftBoard({
       </CardContent>
     </Card>
   );
-}
+});

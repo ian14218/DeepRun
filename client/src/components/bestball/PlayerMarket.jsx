@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { getPlayerMarket } from '@/services/bestBallService';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import TeamLogo from '@/components/TeamLogo';
 import FirstFourPairDialog from '@/components/FirstFourPairDialog';
 import { Search, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
 
-export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd, readOnly }) {
+export default memo(function PlayerMarket({ contestId, roster, budgetRemaining, onAdd, readOnly }) {
   const [players, setPlayers] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -27,8 +27,9 @@ export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd
   const [ffDialogPlayer, setFfDialogPlayer] = useState(null);
   const limit = 25;
 
-  const rosteredIds = new Set(
-    roster.flatMap((r) => [r.player_id, r.paired_player_id].filter(Boolean))
+  const rosteredIds = useMemo(
+    () => new Set(roster.flatMap((r) => [r.player_id, r.paired_player_id].filter(Boolean))),
+    [roster]
   );
 
   const fetchPlayers = useCallback(async () => {
@@ -303,4 +304,4 @@ export default function PlayerMarket({ contestId, roster, budgetRemaining, onAdd
       />
     </div>
   );
-}
+});

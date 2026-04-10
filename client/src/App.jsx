@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
@@ -6,6 +7,9 @@ import AdminRoute from './components/AdminRoute';
 import AppLayout from './components/layout/AppLayout';
 import LeagueLayout from './components/layout/LeagueLayout';
 import AdminLayout from './components/layout/AdminLayout';
+import { Skeleton } from '@/components/ui/skeleton';
+
+// Eagerly loaded (public / high-traffic)
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -13,23 +17,29 @@ import Dashboard from './pages/Dashboard';
 import CreateLeague from './pages/CreateLeague';
 import JoinLeague from './pages/JoinLeague';
 import LeagueDetail from './pages/LeagueDetail';
-import DraftRoom from './pages/DraftRoom';
-import Standings from './pages/Standings';
-import MyTeam from './pages/MyTeam';
-import TeamRoster from './pages/TeamRoster';
-import Scoreboard from './pages/Scoreboard';
-import Bracket from './pages/Bracket';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminUsers from './pages/admin/AdminUsers';
-import AdminLeagues from './pages/admin/AdminLeagues';
-import AdminLeagueDetail from './pages/admin/AdminLeagueDetail';
-import AdminTournament from './pages/admin/AdminTournament';
-import BestBall from './pages/BestBall';
-import BestBallRoster from './pages/BestBallRoster';
-import BestBallLeaderboard from './pages/BestBallLeaderboard';
-import BestBallEntry from './pages/BestBallEntry';
-import BestBallAdmin from './pages/admin/BestBallAdmin';
 import ChangePassword from './pages/ChangePassword';
+
+// Lazy-loaded (less frequent / heavy pages)
+const DraftRoom = lazy(() => import('./pages/DraftRoom'));
+const Standings = lazy(() => import('./pages/Standings'));
+const MyTeam = lazy(() => import('./pages/MyTeam'));
+const TeamRoster = lazy(() => import('./pages/TeamRoster'));
+const Scoreboard = lazy(() => import('./pages/Scoreboard'));
+const Bracket = lazy(() => import('./pages/Bracket'));
+const BestBall = lazy(() => import('./pages/BestBall'));
+const BestBallRoster = lazy(() => import('./pages/BestBallRoster'));
+const BestBallLeaderboard = lazy(() => import('./pages/BestBallLeaderboard'));
+const BestBallEntry = lazy(() => import('./pages/BestBallEntry'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminLeagues = lazy(() => import('./pages/admin/AdminLeagues'));
+const AdminLeagueDetail = lazy(() => import('./pages/admin/AdminLeagueDetail'));
+const AdminTournament = lazy(() => import('./pages/admin/AdminTournament'));
+const BestBallAdmin = lazy(() => import('./pages/admin/BestBallAdmin'));
+
+function LazyFallback() {
+  return <div className="space-y-4 p-4"><Skeleton className="h-8 w-64" /><Skeleton className="h-64 w-full" /></div>;
+}
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -41,6 +51,7 @@ function App() {
     <AuthProvider>
       <SocketProvider>
         <BrowserRouter>
+          <Suspense fallback={<LazyFallback />}>
           <Routes>
             {/* Public — no Navbar */}
             <Route path="/login" element={<Login />} />
@@ -85,6 +96,7 @@ function App() {
             <Route path="/" element={<HomeRedirect />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </SocketProvider>
     </AuthProvider>

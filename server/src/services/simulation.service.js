@@ -6,6 +6,7 @@ const tournamentTeamModel = require('../models/tournamentTeam.model');
 const tournamentConfigModel = require('../models/tournamentConfig.model');
 const bestBallService = require('./bestBall.service');
 const bestBallModel = require('../models/bestBall.model');
+const { createError } = require('../utils/errors');
 
 // Standard bracket matchups for Round of 64 (seed pairings per region)
 const R64_SEED_MATCHUPS = [
@@ -161,13 +162,12 @@ async function simulateRound() {
   const activeCount = allTeams.filter((t) => !t.is_eliminated).length;
   const roundName = getRoundName(activeCount);
   if (!roundName) {
-    const err = new Error(
+    throw createError(
       activeCount <= 1
         ? 'Tournament is over — no more rounds to simulate'
-        : `Invalid team count (${activeCount}) — cannot determine round`
+        : `Invalid team count (${activeCount}) — cannot determine round`,
+      400
     );
-    err.status = 400;
-    throw err;
   }
 
   const roundNum = getRoundNum(activeCount);

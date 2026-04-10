@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import { getAvailablePlayers } from '../services/draftService';
 import { Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import TeamLogo from './TeamLogo';
 import FirstFourPairDialog from './FirstFourPairDialog';
 
-export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
+export default memo(function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
   const [players, setPlayers] = useState([]);
   const [search, setSearch] = useState('');
   const [teamFilter, setTeamFilter] = useState('');
@@ -25,27 +25,35 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const teams = [...new Set(players.map((p) => p.team_name))].sort();
+  const teams = useMemo(
+    () => [...new Set(players.map((p) => p.team_name))].sort(),
+    [players]
+  );
 
-  const visible = players
-    .filter((p) => {
-      if (pickedPlayerIds.includes(p.id)) return false;
-      if (p.is_eliminated || p.team_is_eliminated) return false;
-      if ((p.season_ppg || 0) < 3) return false;
-      if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
-      if (teamFilter && p.team_name !== teamFilter) return false;
-      return true;
-    })
-    .sort((a, b) => {
-      if (sortBy === 'seed') {
-        const seedDiff = (a.seed || 99) - (b.seed || 99);
-        if (seedDiff !== 0) return seedDiff;
-        const teamCmp = (a.team_name || '').localeCompare(b.team_name || '');
-        if (teamCmp !== 0) return teamCmp;
+  const pickedSet = useMemo(() => new Set(pickedPlayerIds), [pickedPlayerIds]);
+
+  const visible = useMemo(
+    () => players
+      .filter((p) => {
+        if (pickedSet.has(p.id)) return false;
+        if (p.is_eliminated || p.team_is_eliminated) return false;
+        if ((p.season_ppg || 0) < 3) return false;
+        if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
+        if (teamFilter && p.team_name !== teamFilter) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'seed') {
+          const seedDiff = (a.seed || 99) - (b.seed || 99);
+          if (seedDiff !== 0) return seedDiff;
+          const teamCmp = (a.team_name || '').localeCompare(b.team_name || '');
+          if (teamCmp !== 0) return teamCmp;
+          return (b.season_ppg || 0) - (a.season_ppg || 0);
+        }
         return (b.season_ppg || 0) - (a.season_ppg || 0);
-      }
-      return (b.season_ppg || 0) - (a.season_ppg || 0);
-    });
+      }),
+    [players, pickedSet, search, teamFilter, sortBy]
+  );
 
   function handlePickClick(player) {
     if (player.is_first_four) {
@@ -178,4 +186,4 @@ export default function PlayerList({ canPick, onPick, pickedPlayerIds = [] }) {
       />
     </>
   );
-}
+});
